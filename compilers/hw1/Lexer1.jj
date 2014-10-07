@@ -1,0 +1,48 @@
+//----------------------------------------------------------------------
+// CS321 Assignment 1 (Fall 2014)
+//
+// miniJava Lexer1 (JavaCC Specification)
+//
+// By Ian Aldrighetti (aldrig@pdx.edu)
+//----------------------------------------------------------------------
+
+PARSER_BEGIN(Lexer1)
+import java.io.*;
+
+public class Lexer1
+{
+	private static Lexer1 parser;
+	
+	public static void main(String[] args)
+	{
+		if (args.length == 0)
+		{
+			System.out.println("miniJava impl: reading from standard input...");
+			parser = new Lexer(System.in);
+		}
+		else if (args.length == 1)
+		{
+			System.out.println("miniJava impl: reading from file " + args[0] + " ...");
+		
+			try
+			{
+				parser = new Lexer1(new FileInputStream(args[0]));
+			}
+			catch (Exception e)
+			{
+				System.out.println("miniJava ERROR: [" + e.getClass().getName() + "] " + e.getMessage());
+				return;
+			}
+		}
+	}
+}
+
+PARSER_END(Lexer1)
+
+SKIP: {
+	  " "
+	| "\t"
+	| "\r"
+	| "\n"
+	| <"//" (
+}
