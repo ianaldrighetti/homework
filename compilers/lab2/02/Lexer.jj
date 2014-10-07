@@ -1,0 +1,60 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// Token definitions.
+//
+// Notes:
+//  1. Multiple tokens can be defined in one group.
+//  2. Not all tokens need to have names.
+//  3. Tokens that start with a "#" are private tokens. 
+//  4. The order of pattern definitions determines their precedence.
+//
+
+PARSER_BEGIN(Lexer)
+public class Lexer {
+  public static void main(String args[]) {
+    Lexer lexer = new Lexer(System.in); 
+    Token tkn = lexer.getNextToken();
+    int tknCnt = 0;
+    while (tkn.kind != 0) {
+      System.out.println("[" + tkn.kind + "] " + tkn.image); 
+      tknCnt++;
+      tkn = lexer.getNextToken();
+    } 
+    System.out.println("Total: " + tknCnt + " tokens"); 
+  }
+}
+PARSER_END(Lexer)
+
+// Token definitions
+//
+SKIP:   { " " | "\t" | "\n" | "\r" } 	// white space chars
+
+SKIP :  // single-line comment
+{ 
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+} 
+
+TOKEN:  // keywords 
+{
+  "begin" | "end" 
+}
+
+TOKEN:  // identifiers and integer literals
+{
+  <#DIGIT:  ["0"-"9"]> 		  // internal tokens
+| <#LETTER: ["A"-"Z"]|["a"-"z"]>
+| <ID:      (<LETTER>)+> 
+| <INTLIT:  (<DIGIT>)+> 
+| <REALLIT:  (<DIGIT>)* "." (<DIGIT>)+> 
+}
+
+TOKEN:  // operators
+{
+  "+" | "-" | "*" | "/" 
+}
+
+SKIP:   { <OTHER: (~[])> } 	  // any other chars

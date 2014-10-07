@@ -1,0 +1,76 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// Error handling.
+//
+// Notes:
+//  1. JavaCC raises a "TokenMgrError" when it detects a lexical error.
+//  2. The TokenMgrError constructor takes two arguments: a message and
+//     an integer error code ("1" means lexical error).
+//  3. We can re-wrap a Java exeception as a TokenMgrError, making the 
+//     error message more targeted.
+//
+
+PARSER_BEGIN(Lexer)
+public class Lexer {
+  static String tknName = null;	// an ad hoc token name solution
+  public static void main(String args[]) {
+    try {
+      Lexer lexer = new Lexer(System.in); 
+      Token tkn = lexer.getNextToken();
+      int tknCnt = 0;
+      while (tkn.kind != 0) {
+        System.out.print("(" + tkn.beginLine + "," + tkn.beginColumn + ")\t" 
+      			 + (tknName==null? "" : tknName) + "\t");
+        if (tkn.kind == INTLIT) {
+	  try {
+	    System.out.println(Integer.parseInt(tkn.image));
+	  } catch (NumberFormatException e) {
+	    throw new TokenMgrError("Integer overflow: " + tkn.image, 0);
+	  }
+	} else {
+	  System.out.println(tkn.image);
+	}
+        tknCnt++;
+        tknName = null;	      	// reset for next token
+        tkn = lexer.getNextToken();
+      } 
+      System.out.println("Total: " + tknCnt + " tokens"); 
+    } catch (TokenMgrError e) {
+      System.err.println(e); 
+    }
+  }
+}
+PARSER_END(Lexer)
+
+// Token definitions
+//
+SKIP:   { " " | "\t" | "\n" | "\r" } 	// white space chars
+
+SKIP :  // single-line comment
+{ 
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+} 
+
+TOKEN:  // keywords 
+{
+  "begin" | "end" 
+}
+
+TOKEN:  // identifiers and integer literals
+{
+  <#DIGIT:  ["0"-"9"]>            // internal tokens
+| <#LETTER: ["A"-"Z"]|["a"-"z"]>
+| <ID:      (<LETTER>)+> { Lexer.tknName = "ID"; }
+| <INTLIT:  (<DIGIT>)+>  { Lexer.tknName = "INTLIT"; }
+}
+
+TOKEN:  // operators
+{
+  "+" | "-" | "*" | "/" 
+}
+
+//SKIP:   { <OTHER: (~[])> } 	  // any other chars

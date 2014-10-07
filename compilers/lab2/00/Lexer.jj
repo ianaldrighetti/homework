@@ -1,0 +1,34 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// The "echo" program.
+//
+// Notes:
+//  1. The input source is passed in as a parameter to the lexer constructor.
+//  2. "~[]" is JavaCC's wildchar.
+//  3. The main interface function to the lexer is "getNextToken()".
+//  4. A token is represented by a "Token" object, which has 
+//     - a "kind" field representing the token's internal code, and 
+//     - an "image" field holding the token's lexeme.
+//
+
+PARSER_BEGIN(Lexer)
+public class Lexer {
+  public static void main(String args[]) {
+    Lexer lexer = new Lexer(System.in); 
+    Token tkn = lexer.getNextToken();
+    while (tkn.kind != 0) {
+      System.out.print(tkn.image); 
+      tkn = lexer.getNextToken();
+    } 
+  }
+}
+PARSER_END(Lexer)
+
+// Token Definitions
+//
+TOKEN: { <ANYCHAR: ~[]> }	// matches any char
+

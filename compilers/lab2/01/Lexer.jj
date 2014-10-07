@@ -1,0 +1,39 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// Recognizing IDs.
+//
+// Notes:
+//  1. SKIP: Simply throw away the matched string.
+//  2. If a pattern is a single char or a string literal (e.g. "\t"), 
+//     the angle brackets "<>" can be omitted.
+//  
+
+PARSER_BEGIN(Lexer)
+public class Lexer {
+  public static void main(String args[]) {
+    Lexer lexer = new Lexer(System.in); 
+    Token tkn = lexer.getNextToken();
+    int tknCnt = 0;
+    while (tkn.kind != 0) {
+      System.out.println(tkn.image); 
+      tknCnt++;
+      tkn = lexer.getNextToken();
+    } 
+    System.out.println("Total: " + tknCnt + " tokens"); 
+  }
+}
+PARSER_END(Lexer)
+
+// Token Definitions
+//
+SKIP:   { " " | "\t" | "\n" | "\r" }        // white space chars
+
+TOKEN:  { <ID: (["A"-"Z"]|["a"-"z"])+> }    // identifiers
+
+SKIP:   { <OTHER: (~[])> }             	    // any other chars
+
+

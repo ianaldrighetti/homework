@@ -1,0 +1,65 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// Token values.
+//
+// Notes:
+//  1. It's convenient to use Java ulitility function "Integer.parseInt()" 
+//     to convert sequence of digits to integer value.
+//
+
+PARSER_BEGIN(Lexer)
+public class Lexer {
+  static String tknName = null;	// an ad hoc token name solution
+
+  public static void main(String args[]) {
+    Lexer lexer = new Lexer(System.in); 
+    Token tkn = lexer.getNextToken();
+    int tknCnt = 0;
+    while (tkn.kind != 0) {
+      System.out.print("(" + tkn.beginLine + "," + tkn.beginColumn + ")\t" 
+			 + (tknName==null? "" : tknName) + "\t");
+      if (tkn.kind == INTLIT)
+	System.out.println(Integer.parseInt(tkn.image));
+      else
+	System.out.println(tkn.image);
+      tknCnt++;
+      tknName = null;		// reset for next token
+      tkn = lexer.getNextToken();
+    } 
+    System.out.println("Total: " + tknCnt + " tokens"); 
+  }
+}
+PARSER_END(Lexer)
+
+// Token definitions
+//
+SKIP:   { " " | "\t" | "\n" | "\r" } 	// white space chars
+
+SKIP :  // single-line comment
+{ 
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+} 
+
+TOKEN:  // keywords 
+{
+  "begin" | "end" 
+}
+
+TOKEN:  // identifiers and integer literals
+{
+  <#DIGIT:  ["0"-"9"]>            // internal tokens
+| <#LETTER: ["A"-"Z"]|["a"-"z"]>
+| <ID:      (<LETTER>)+> { Lexer.tknName = "ID"; }
+| <INTLIT:  (<DIGIT>)+>  { Lexer.tknName = "INTLIT"; }
+}
+
+TOKEN:  // operators
+{
+  "+" | "-" | "*" | "/" 
+}
+
+SKIP:   { <OTHER: (~[])> } 	  // any other chars

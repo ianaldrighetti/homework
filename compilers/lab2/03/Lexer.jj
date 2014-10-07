@@ -1,0 +1,63 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// Lexer states.
+//
+// Notes:
+//  1. Using lexer states makes the handling of multi-line comments easy.
+//
+
+PARSER_BEGIN(Lexer)
+public class Lexer {
+  public static void main(String args[]) {
+    Lexer lexer = new Lexer(System.in); 
+    Token tkn = lexer.getNextToken();
+    int tknCnt = 0;
+    while (tkn.kind != 0) {
+      System.out.println("[" + tkn.kind + "] " + tkn.image); 
+      tknCnt++;
+      tkn = lexer.getNextToken();
+    } 
+    System.out.println("Total: " + tknCnt + " tokens"); 
+  }
+}
+PARSER_END(Lexer)
+
+// Token definitions
+//
+SKIP:   { " " | "\t" | "\n" | "\r" } 	// white space chars
+
+SKIP :  // comments
+{ 
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>  // single-line comment
+| "/*" : ML_COMMENT		// enter multi-line-comment state
+} 
+
+<ML_COMMENT> SKIP :		// inside multi-line-comment state
+{ 
+  "*/" : DEFAULT		// return to default state
+| <~[]>
+} 
+
+TOKEN:  // keywords 
+{
+  "begin" | "end" 
+}
+
+TOKEN:  // identifiers and integer literals
+{
+  <#DIGIT:  ["0"-"9"]> 		  // internal tokens
+| <#LETTER: ["A"-"Z"]|["a"-"z"]>
+| <ID:      (<LETTER>)+> 
+| <INTLIT:  (<DIGIT>)+> 
+}
+
+TOKEN:  // operators
+{
+  "+" | "-" | "*" | "/" 
+}
+
+SKIP:   { <OTHER: (~[])> } 	  // any other chars
