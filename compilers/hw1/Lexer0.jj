@@ -1,0 +1,20 @@
+//----------------------------------------------------------------------
+// CS321 Assignment 1 (Fall 2014)
+//
+// miniJava Lexer1 (JavaCC Specification)
+//----------------------------------------------------------------------
+
+PARSER_BEGIN(Lexer1)
+import java.io.*;
+
+public class Lexer1 {
+  public static void main(String [] args) {
+    
+    // need more code here ...
+  
+  }
+}
+PARSER_END(Lexer1)
+
+// need more code here ...
+

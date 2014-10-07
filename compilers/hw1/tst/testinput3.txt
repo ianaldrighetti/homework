@@ -1,0 +1,9 @@
+// string literals
+//
+
+"..."
+"12	4567890"
+""
+"12""34"  // two strings
+"this \n is OK"
+"A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long string!"

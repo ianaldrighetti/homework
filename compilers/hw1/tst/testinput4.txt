@@ -1,0 +1,9 @@
+// reserved words and identifiers
+//
+class extends static public void int boolean new this if else while
+return main String true false System out println
+
+classextends static1 ppublic Void bool system TRUE 0main
+
+AveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryveryLongID
+

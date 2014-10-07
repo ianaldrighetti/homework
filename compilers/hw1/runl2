@@ -1,0 +1,31 @@
+#!/bin/sh
+
+#----------------------------------------------------------------------
+# CS321 Assignment 1 (Fall 2014)
+#
+# Run script for Lexer2. 
+#   -- runs Lexer2 on input files and compare results with .ref version
+#
+# Usage:
+#   linux> ./runl2 tst/*.txt  (assume input files are tst/xxx.txt)
+#
+#----------------------------------------------------------------------
+
+for i
+do
+	d=`dirname $i`
+	f=`basename $i .txt`
+	echo $d/$f:
+	java Lexer2 $d/$f.txt 1> $d/$f.tkn 2>$d/$f.lerr
+	if [ -r $d/$f.tkn.ref ]; 
+	then echo "Diff .tkn files ----------------------------";
+             diff -w $d/$f.tkn $d/$f.tkn.ref; 
+        fi
+	if [ -r $d/$f.lerr.ref ]; 
+        then echo "Diff .lerr files ---------------------------";
+             diff -w $d/$f.lerr $d/$f.lerr.ref; 
+	else cat $d/$f.lerr; 
+        fi
+done
+exit 0
+
