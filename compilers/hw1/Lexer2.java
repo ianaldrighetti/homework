@@ -211,7 +211,7 @@ public class Lexer2 implements mjTokenConstants
     	
     	reservedMap = new HashMap<String, Integer>();
     	reservedMap.put("class", CLASS);
-    	reservedMap.add("extends", EXTENDS);
+    	reservedMap.put("extends", EXTENDS);
     	reservedMap.put("static", STATIC);
     	reservedMap.put("public", PUBLIC);
     	reservedMap.put("void", VOID);
@@ -536,7 +536,7 @@ public class Lexer2 implements mjTokenConstants
     	}
     	
     	// Only operators contain entries with 2 characters.
-    	if (operators.contain(buffer.toString()))
+    	if (operators.contains(buffer.toString()))
     	{
     		return true;
     	}
