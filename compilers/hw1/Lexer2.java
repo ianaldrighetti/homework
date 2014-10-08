@@ -69,8 +69,28 @@ public class Lexer2 implements mjTokenConstants
 		{
 			this.kind = kind;
 			this.line = line;
-			this.column = line;
+			this.column = column;
 			this.lexeme = lexeme;
+		}
+		
+		public int kind()
+		{
+			return kind;
+		}
+		
+		public int line()
+		{
+			return line;
+		}
+		
+		public int column()
+		{	
+			return column;
+		}
+		
+		public String lexeme()
+		{
+			return lexeme;
 		}
 	}
 	
@@ -121,7 +141,7 @@ public class Lexer2 implements mjTokenConstants
 			return pos;
 		}
 		
-		public int setPos(int pos)
+		public void setPos(int pos)
 		{
 			if (pos >= str.length())
 			{
@@ -147,7 +167,7 @@ public class Lexer2 implements mjTokenConstants
 		}
 	}
 
-    public void main(String[] args)
+    public static void main(String[] args)
     {
 		if (args.length == 0)
 		{
@@ -172,12 +192,25 @@ public class Lexer2 implements mjTokenConstants
 			}
 			
 			Buffer b = new Buffer(buffer.toString());
-			List<Token> tokens = parse(b);
+			Lexer2 lexer = new Lexer2();
+			List<Token> tokens = lexer.parse(b);
+			
+			displayTokens(tokens);
 		}
 		catch (Exception e)
 		{
 			System.err.println("ERROR: [" + e.getClass().getName() + "] " + e.getMessage());
 		}
+    }
+    
+    public static void displayTokens(List<Token> tokens)
+    {
+		for (Token token : tokens)
+		{
+			System.out.println("(" + token.line() + "," + token.column() + ")\t" + token.lexeme());
+		}
+		
+		System.out.println("Total: " + tokens.size() + " tokens");
     }
     
     // Loads the reserved keywords into a set, if necessary.
@@ -273,7 +306,7 @@ public class Lexer2 implements mjTokenConstants
     */
     
     // Parses the file, within the buffer.
-    public List<Token> parse(Buffer buffer) throws LexError
+    public List<Token> parse(Buffer buffer) throws LexError, Exception
     {
     	lineNumber = 1;
     	columnNumber = 1;
@@ -296,7 +329,7 @@ public class Lexer2 implements mjTokenConstants
     			continue;
     		}
     		
-    		Token token = tokenize(c, buffer);
+    		Token token = tokenize((char)c, buffer);
     		
     		// It might be empty (a comment, perhaps).
     		if (token == null)
@@ -306,9 +339,11 @@ public class Lexer2 implements mjTokenConstants
     		
     		tokens.add(token);
     	}
+    	
+    	return tokens;
     }
     
-    private Token tokenize(char ch, Buffer buffer)
+    private Token tokenize(char ch, Buffer buffer) throws Exception
     {
 		Token token;
 		
@@ -325,14 +360,14 @@ public class Lexer2 implements mjTokenConstants
     		return getIntegerLiteral(ch, buffer);
     	}
     	//done
-    	else if (buffer.peek(1) > -1 && ((ch == '/' && buffer.peek(1) == '/') || (ch == '/' && buffer.peek(1) == '*')))
+    	else if (buffer.peek(0) > -1 && ((ch == '/' && ((char)buffer.peek(0)) == '/') || (ch == '/' && ((char)buffer.peek(0)) == '*')))
     	{
     		handleComment(ch, buffer);
     		
     		return null;
     	}
     	//done
-    	else if (isOperatorOrDelimiter(ch, buffer.peek(1)))
+    	else if (isOperatorOrDelimiter(ch, buffer.peek(0)))
     	{
     		return getOperatorOrDelimiter(ch, buffer);
     	}
@@ -348,7 +383,7 @@ public class Lexer2 implements mjTokenConstants
     	else
     	{
 			// !!! TODO: THROW LEXERROR
-			throw new Exception("UNKNOWN CHAR: " + ch);
+			throw new Exception("UNKNOWN CHAR: " + ch + " " + (char)buffer.peek(0));
     	}
     }
     
@@ -407,7 +442,7 @@ public class Lexer2 implements mjTokenConstants
 		StringBuilder strBuffer = new StringBuilder();
 		strBuffer.append(ch);
 		
-		int offset = 1;
+		int offset = 0;
 		while (true)
 		{
 			if (!Character.isLetter(buffer.peek(offset)) && !Character.isDigit(buffer.peek(offset)))
@@ -440,7 +475,7 @@ public class Lexer2 implements mjTokenConstants
 			boolean finished = false;
 			while (true)
 			{
-				if (buffer.next() == '*' && buffer.peek(1) == '/')
+				if (buffer.next() == '*' && buffer.peek(0) == '/')
 				{
 					columnNumber += 2;
 					
@@ -484,6 +519,7 @@ public class Lexer2 implements mjTokenConstants
     
     private Token getIntegerLiteral(char ch, Buffer buffer)
     {
+		int originalColumnNumber = columnNumber;
     	// Set the position to the original character (ch).
     	int pos = buffer.getPos() - 1;
     	
@@ -499,30 +535,34 @@ public class Lexer2 implements mjTokenConstants
     			break;
     		}
     		
-    		intBuffer.append((char)ch);
+    		intBuffer.append((char)cur);
     		pos++;
     	}
     	
     	buffer.setPos(pos);
     	
     	columnNumber += intBuffer.toString().length();
-    	return new Token(INTLIT, lineNumber, columnNumber, intBuffer.toString());
+    	return new Token(INTLIT, lineNumber, originalColumnNumber, intBuffer.toString());
     }
     
     private Token getOperatorOrDelimiter(char ch, Buffer buffer)
     {
-    	String str = String.valueOf(ch) + (buffer.peek(1) == -1 ? "" : String.valueOf(buffer.peek(1)));
-    
+		int originalColumnNumber = columnNumber;
+		
+    	String str = String.valueOf(ch) + (buffer.peek(0) == -1 ? "" : String.valueOf((char)buffer.peek(0)));
+		
     	if (getOperatorMap().containsKey(str))
     	{
 			columnNumber += str.length();
 			buffer.next();
-			return new Token(getOperatorMap().get(str), lineNumber, columnNumber, str);
+			
+			return new Token(getOperatorMap().get(str), lineNumber, originalColumnNumber, str);
     	}
     	
     	str = String.valueOf(ch);
     	columnNumber++;
-    	return new Token((int)ch, lineNumber, columnNumber, str);
+    	
+    	return new Token((int)ch, lineNumber, originalColumnNumber, str);
     }
     
     private boolean isOperatorOrDelimiter(char ch, int nextCh)
