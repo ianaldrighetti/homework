@@ -14,6 +14,8 @@ public class Lexer2 implements mjTokenConstants
 	// A set containing reserved keywords.
 	private Set<String> reservedKeywords;
 	
+	private Map<String, Integer> reservedMap;
+	
 	private Set<String> operators;
 	
 	private Set<String> delimiters;
@@ -92,6 +94,16 @@ public class Lexer2 implements mjTokenConstants
 			}
 			
 			return (int)str.charAt(pos++);
+		}
+		
+		public int current()
+		{
+			if (pos >= str.length())
+			{
+				return -1;
+			}
+			
+			return (int)str.charAt(pos);
 		}
 		
 		public int peek(int offset)
@@ -197,6 +209,27 @@ public class Lexer2 implements mjTokenConstants
     	reservedKeywords.add("out");
     	reservedKeywords.add("println");
     	
+    	reservedMap = new HashMap<String, Integer>();
+    	reservedMap.put("class", CLASS);
+    	reservedMap.add("extends", EXTENDS);
+    	reservedMap.put("static", STATIC);
+    	reservedMap.put("public", PUBLIC);
+    	reservedMap.put("void", VOID);
+    	reservedMap.put("int", INT);
+    	reservedMap.put("boolean", BOOLEAN);
+    	reservedMap.put("new", NEW);
+    	reservedMap.put("if", IF);
+    	reservedMap.put("else", ELSE);
+    	reservedMap.put("while", WHILE);
+    	reservedMap.put("return", RETURN);
+    	reservedMap.put("main", MAIN);
+    	reservedMap.put("true", TRUE);
+    	reservedMap.put("false", FALSE);
+    	reservedMap.put("String", STRING);
+    	reservedMap.put("System", SYSTEM);
+    	reservedMap.put("out", OUT);
+    	reservedMap.put("println", PRINTLN);
+    	
     	operators = new HashSet<String>();
     	operators.add("+");
     	operators.add("-");
@@ -277,7 +310,10 @@ public class Lexer2 implements mjTokenConstants
     
     private Token tokenize(char ch, Buffer buffer)
     {
+		Token token;
+		
     	// Is it a string?
+    	//done
     	if (ch == '"')
     	{
     		return getStringLiteral(ch, buffer);
@@ -288,25 +324,162 @@ public class Lexer2 implements mjTokenConstants
     		// TODO: Remember, check it's size!
     		return getIntegerLiteral(ch, buffer);
     	}
+    	//done
     	else if (buffer.peek(1) > -1 && ((ch == '/' && buffer.peek(1) == '/') || (ch == '/' && buffer.peek(1) == '*')))
     	{
-    		// !!! TODO: Line number may need to be handled differently (multiline comment).
     		handleComment(ch, buffer);
     		
     		return null;
     	}
+    	//done
     	else if (isOperatorOrDelimiter(ch, buffer.peek(1)))
     	{
     		return getOperatorOrDelimiter(ch, buffer);
     	}
-    	else if (isReservedKeyword(ch, buffer))
+    	//done
+    	else if ((token = getReservedKeyword(ch, buffer)) != null)
     	{
-    		return getReservedKeyword(ch, buffer);
+    		return token;
+    	}
+    	else if (Character.isLetter(ch))
+    	{
+    		return getIdentifier(ch, buffer);
     	}
     	else
     	{
-    		// Must be an identifier.
+			// !!! TODO: THROW LEXERROR
+			throw new Exception("UNKNOWN CHAR: " + ch);
     	}
+    }
+    
+    private Token getStringLiteral(char ch, Buffer buffer)
+    {
+		columnNumber++;
+		StringBuilder strBuffer = new StringBuilder();
+		
+		int c;
+		while((c = buffer.next()) != -1)
+		{
+			columnNumber++;
+			
+			// We do not allow \n or \r.
+			if (c == '\r' || c == '\n')
+			{
+				// TODO: Replace with lexer error.
+				throw new IllegalArgumentException("NOT ALLOWED.");
+			}
+			
+			// No double quotes are allowed in strings, so this is it.
+			if (c == '"')
+			{
+				break;
+			}
+		
+			strBuffer.append((char)c);
+		}
+		
+		return new Token(STRLIT, lineNumber, columnNumber, strBuffer.toString());
+    }
+    
+    private Token getIdentifier(char ch, Buffer buffer)
+    {
+		StringBuilder strBuffer = new StringBuilder();
+		columnNumber++;
+		strBuffer.append(ch);
+		
+		while (true)
+		{
+			if (!Character.isLetter(buffer.next()) && !Character.isDigit(buffer.current()))
+			{
+				buffer.setPos(buffer.getPos() - 1);
+				break;
+			}
+			
+			strBuffer.append(buffer.current());
+			columnNumber++;
+		}
+		
+		return new Token(ID, lineNumber, columnNumber, strBuffer.toString());
+    }
+    
+    private Token getReservedKeyword(char ch, Buffer buffer)
+    {
+		StringBuilder strBuffer = new StringBuilder();
+		strBuffer.append(ch);
+		
+		int offset = 1;
+		while (true)
+		{
+			if (!Character.isLetter(buffer.peek(offset)) && !Character.isDigit(buffer.peek(offset)))
+			{
+				break;
+			}
+			
+			strBuffer.append(buffer.peek(offset++));
+		}
+		
+		if (!reservedKeywords.contains(strBuffer.toString()))
+		{
+			return null;
+		}
+		
+		columnNumber += strBuffer.toString().length();
+		// !!! TODO: VERIFY THIS.
+		buffer.setPos(buffer.getPos() + strBuffer.toString().length() - 1);
+		return new Token(reservedMap.get(strBuffer.toString()), lineNumber, columnNumber, strBuffer.toString());
+    }
+    
+    private void handleComment(char ch, Buffer buffer)
+    {
+		columnNumber++;
+		
+		// This will also get passed the / as well.
+		if (buffer.next() == '*')
+		{
+			// Multiline, keep going until we get to */
+			boolean finished = false;
+			while (true)
+			{
+				if (buffer.next() == '*' && buffer.peek(1) == '/')
+				{
+					columnNumber += 2;
+					
+					// We peeked at the /, make it official.
+					buffer.next();
+					finished = true;
+					break;
+				}
+				
+				if (buffer.current() == '\n')
+				{
+					lineNumber++;
+					columnNumber = 1;
+				}
+				else
+				{
+					columnNumber++;
+				}
+			}
+			
+			if (!finished)
+			{
+				// !!! TODO: THROW LEXER ERROR.
+				System.err.println("FIX ME");
+				System.exit(1);
+			}
+			
+			return;
+		}
+		
+		while (true)
+		{
+			if (buffer.next() == '\n')
+			{
+				lineNumber++;
+				columnNumber = 1;
+				break;
+			}
+		}
     }
     
     private Token getIntegerLiteral(char ch, Buffer buffer)
@@ -340,7 +513,16 @@ public class Lexer2 implements mjTokenConstants
     {
     	String str = String.valueOf(ch) + (buffer.peek(1) == -1 ? "" : String.valueOf(buffer.peek(1)));
     
-    	// !!! LEFT OFF HERE TODO
+    	if (getOperatorMap().containsKey(str))
+    	{
+			columnNumber += str.length();
+			buffer.next();
+			return new Token(getOperatorMap().get(str), lineNumber, columnNumber, str);
+    	}
+    	
+    	str = String.valueOf(ch);
+    	columnNumber++;
+    	return new Token((int)ch, lineNumber, columnNumber, str);
     }
     
     private boolean isOperatorOrDelimiter(char ch, int nextCh)
