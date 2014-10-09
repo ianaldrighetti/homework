@@ -233,15 +233,20 @@ public class Lexer2 implements mjTokenConstants
 		}
 		else if (token.kind() == INTLIT)
 		{
-			int val = 0;
+			long val = 0;
 			
 			try
 			{
-				val = Integer.parseInt(token.lexeme());
+				val = Long.parseLong(token.lexeme());
 			}
 			catch (NumberFormatException e)
 			{
-				throw new Exception("Invalid number.");
+				throw new LexError("The value " + token.lexeme() + " is not a number.", token.line(), token.column());
+			}
+			
+			if (val > Integer.MAX_VALUE)
+			{
+				throw new LexError("The integer " + val + " is too large (must not be larger than 2^31 - 1).", token.line(), token.column());
 			}
 			
 			buffer.append("INTLIT(").append(val).append(")");
@@ -429,12 +434,11 @@ public class Lexer2 implements mjTokenConstants
     	}
     	else
     	{
-			// !!! TODO: THROW LEXERROR
-			throw new Exception("UNKNOWN CHAR: " + ch + " " + (char)buffer.peek(0));
+			throw new LexError("Unrecognized character: " + ch, lineNumber, columnNumber);
     	}
     }
     
-    private Token getStringLiteral(char ch, Buffer buffer)
+    private Token getStringLiteral(char ch, Buffer buffer) throws LexError
     {
 		int originalColumnNumber = columnNumber;
 		columnNumber++;
@@ -446,10 +450,14 @@ public class Lexer2 implements mjTokenConstants
 			columnNumber++;
 			
 			// We do not allow \n or \r.
-			if (c == '\r' || c == '\n')
+			if (c == '\r')
 			{
 				// TODO: Replace with lexer error.
-				throw new IllegalArgumentException("NOT ALLOWED.");
+				throw new LexError("Unexpected carriage return in string (strings may not contain this character).", lineNumber, columnNumber);
+			}
+			else if (c == '\n')
+			{
+				throw new LexError("Unexpected line feed in string (strings may not contain this character).", lineNumber, columnNumber);
 			}
 			
 			// No double quotes are allowed in strings, so this is it.
