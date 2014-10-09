@@ -1,0 +1,9 @@
+(3,1)	INTLIT(123)
+(4,1)	INTLIT(11)
+(5,1)	INTLIT(1234567890)
+(6,1)	INTLIT(2147483647)
+(8,1)	-
+(8,2)	INTLIT(3)
+(8,3)	.
+(8,4)	INTLIT(1415)
+Total: 8 tokens

@@ -1,0 +1,8 @@
+(4,1)	STRLIT("...")
+(5,1)	STRLIT("12	4567890")
+(6,1)	STRLIT("")
+(7,1)	STRLIT("12")
+(7,5)	STRLIT("34")
+(8,1)	STRLIT("this \n is OK")
+(9,1)	STRLIT("A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long string!")
+Total: 7 tokens

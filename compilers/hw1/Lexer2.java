@@ -197,6 +197,11 @@ public class Lexer2 implements mjTokenConstants
 			
 			displayTokens(tokens);
 		}
+		catch (LexError e)
+		{
+			System.err.println("!!! miniJava Lexical Error: " + e.getMessage());
+			System.err.println("    Line: " + e.getLine() + ", column: " + e.getColumn());
+		}
 		catch (Exception e)
 		{
 			System.err.println("ERROR: [" + e.getClass().getName() + "] " + e.getMessage());
