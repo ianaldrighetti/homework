@@ -203,14 +203,59 @@ public class Lexer2 implements mjTokenConstants
 		}
     }
     
-    public static void displayTokens(List<Token> tokens)
+    public static void displayTokens(List<Token> tokens) throws Exception
     {
+		System.out.println(getTokenOutput(tokens));
+    }
+    
+    public static String getTokenOutput(List<Token> tokens) throws Exception
+    {
+		StringBuilder buffer = new StringBuilder();
+		
 		for (Token token : tokens)
 		{
-			System.out.println("(" + token.line() + "," + token.column() + ")\t" + token.lexeme());
+			buffer.append(getTokenRepresentation(token)).append("\n");
 		}
 		
-		System.out.println("Total: " + tokens.size() + " tokens");
+		buffer.append("Total: ").append(tokens.size()).append(" tokens");
+		
+		return buffer.toString();
+    }
+    
+    private static String getTokenRepresentation(Token token) throws Exception
+    {
+		StringBuilder buffer = new StringBuilder();
+		buffer.append("(").append(token.line()).append(",").append(token.column()).append(")\t");
+		
+		if (token.kind() == ID)
+		{
+			buffer.append("ID(").append(token.lexeme()).append(")");
+		}
+		else if (token.kind() == INTLIT)
+		{
+			int val = 0;
+			
+			try
+			{
+				val = Integer.parseInt(token.lexeme());
+			}
+			catch (NumberFormatException e)
+			{
+				throw new Exception("Invalid number.");
+			}
+			
+			buffer.append("INTLIT(").append(val).append(")");
+		}
+		else if (token.kind() == STRLIT)
+		{
+			buffer.append("STRLIT(\"").append(token.lexeme()).append("\")");
+		}
+		else
+		{
+			buffer.append(token.lexeme());
+		}
+		
+		return buffer.toString();
     }
     
     // Loads the reserved keywords into a set, if necessary.
@@ -241,6 +286,7 @@ public class Lexer2 implements mjTokenConstants
     	reservedKeywords.add("System");
     	reservedKeywords.add("out");
     	reservedKeywords.add("println");
+    	reservedKeywords.add("this");
     	
     	reservedMap = new HashMap<String, Integer>();
     	reservedMap.put("class", CLASS);
@@ -262,6 +308,7 @@ public class Lexer2 implements mjTokenConstants
     	reservedMap.put("System", SYSTEM);
     	reservedMap.put("out", OUT);
     	reservedMap.put("println", PRINTLN);
+    	reservedMap.put("this", THIS);
     	
     	operators = new HashSet<String>();
     	operators.add("+");
@@ -389,6 +436,7 @@ public class Lexer2 implements mjTokenConstants
     
     private Token getStringLiteral(char ch, Buffer buffer)
     {
+		int originalColumnNumber = columnNumber;
 		columnNumber++;
 		StringBuilder strBuffer = new StringBuilder();
 		
@@ -413,32 +461,12 @@ public class Lexer2 implements mjTokenConstants
 			strBuffer.append((char)c);
 		}
 		
-		return new Token(STRLIT, lineNumber, columnNumber, strBuffer.toString());
+		return new Token(STRLIT, lineNumber, originalColumnNumber, strBuffer.toString());
     }
     
     private Token getIdentifier(char ch, Buffer buffer)
     {
-		StringBuilder strBuffer = new StringBuilder();
-		columnNumber++;
-		strBuffer.append(ch);
-		
-		while (true)
-		{
-			if (!Character.isLetter(buffer.next()) && !Character.isDigit(buffer.current()))
-			{
-				buffer.setPos(buffer.getPos() - 1);
-				break;
-			}
-			
-			strBuffer.append(buffer.current());
-			columnNumber++;
-		}
-		
-		return new Token(ID, lineNumber, columnNumber, strBuffer.toString());
-    }
-    
-    private Token getReservedKeyword(char ch, Buffer buffer)
-    {
+		int originalColumnNumber = columnNumber;
 		StringBuilder strBuffer = new StringBuilder();
 		strBuffer.append(ch);
 		
@@ -450,7 +478,29 @@ public class Lexer2 implements mjTokenConstants
 				break;
 			}
 			
-			strBuffer.append(buffer.peek(offset++));
+			strBuffer.append((char)buffer.peek(offset++));
+		}
+		
+		columnNumber += strBuffer.toString().length();
+		buffer.setPos(buffer.getPos() + strBuffer.toString().length() - 1);
+		return new Token(ID, lineNumber, originalColumnNumber, strBuffer.toString());
+    }
+    
+    private Token getReservedKeyword(char ch, Buffer buffer)
+    {
+		int originalColumnNumber = columnNumber;
+		StringBuilder strBuffer = new StringBuilder();
+		strBuffer.append(ch);
+		
+		int offset = 0;
+		while (true)
+		{
+			if (!Character.isLetter(buffer.peek(offset)) && !Character.isDigit(buffer.peek(offset)))
+			{
+				break;
+			}
+			
+			strBuffer.append((char)buffer.peek(offset++));
 		}
 		
 		if (!reservedKeywords.contains(strBuffer.toString()))
@@ -461,7 +511,7 @@ public class Lexer2 implements mjTokenConstants
 		columnNumber += strBuffer.toString().length();
 		// !!! TODO: VERIFY THIS.
 		buffer.setPos(buffer.getPos() + strBuffer.toString().length() - 1);
-		return new Token(reservedMap.get(strBuffer.toString()), lineNumber, columnNumber, strBuffer.toString());
+		return new Token(reservedMap.get(strBuffer.toString()), lineNumber, originalColumnNumber, strBuffer.toString());
     }
     
     private void handleComment(char ch, Buffer buffer)
