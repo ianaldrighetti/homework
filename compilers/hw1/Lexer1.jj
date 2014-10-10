@@ -6,42 +6,127 @@
 // By Ian Aldrighetti (aldrig@pdx.edu)
 //----------------------------------------------------------------------
 
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+//
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// File Input.
+//
+// Notes:
+//  1. We can also use "FileReader" instead of "FileInputStream".
+//
+
 PARSER_BEGIN(Lexer1)
-import java.io.*;
+import java.io.FileInputStream;
 
 public class Lexer1
 {
-	private static Lexer1 parser;
-	
-	public static void main(String[] args)
+	public static String tknName = null;	// an ad hoc token name solution
+
+	public static void main(String args[])
 	{
-		/*if (args.length == 0)
+		try
 		{
-			System.out.println("miniJava impl: reading from standard input...");
-			parser = new Lexer(System.in);
+			FileInputStream stream = new FileInputStream(args[0]);
+			Lexer1 lexer = new Lexer1(stream);
+			Token tkn = lexer.getNextToken();
+			int tknCnt = 0;
+			while (tkn.kind != 0)
+			{
+				displayToken(tkn);
+
+				tknCnt++;
+				tknName = null;	      	// reset for next token
+				tkn = lexer.getNextToken();
+			}
+			System.out.println("Total: " + tknCnt + " tokens");
+			stream.close();
 		}
-		else if (args.length == 1)
+		catch (TokenMgrError e)
 		{
-			System.out.println("miniJava impl: reading from file " + args[0] + " ...");
-		
+			System.err.println(e);
+		}
+		catch (Exception e)
+		{
+			System.err.println(e);
+		}
+	}
+
+	private static void displayToken(Token tkn)
+	{
+		System.out.print("(" + tkn.beginLine + "," + tkn.beginColumn + ")");
+		System.out.print("\t" + (tknName == null ? "" : tknName + "("));
+
+		if (tkn.kind == INTLIT)
+		{
 			try
 			{
-				parser = new Lexer1(new FileInputStream(args[0]));
+				System.out.print(Integer.parseInt(tkn.image));
 			}
-			catch (Exception e)
+			catch (NumberFormatException e)
 			{
-				System.out.println("miniJava ERROR: [" + e.getClass().getName() + "] " + e.getMessage());
-				return;
+				throw new TokenMgrError("Integer overflow: " + tkn.image, 0);
 			}
-		}*/
+		}
+		else
+		{
+			System.out.print(tkn.image);
+		}
+
+		System.out.println((tknName != null ? ")" : ""));
 	}
 }
-
 PARSER_END(Lexer1)
 
-SKIP: {
-	  " "
-	| "\t"
-	| "\r"
-	| "\n"
+// Ignore whitespace, tabs, carriage returns and new lines.
+SKIP:
+{
+	" " | "\t" | "\n" | "\r"
+}
+
+// Skip comments, single and multiline.
+SKIP:
+{
+	<"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> |
+	<"/*">: MULTILINE_COMMENT
+}
+
+// Skips characters within comments.
+<MULTILINE_COMMENT> SKIP:
+{
+	<"*/">: DEFAULT |
+	<~[]>
+}
+
+// Reserved words.
+TOKEN:
+{
+	"class" | "extends" | "static" | "public" | "void" | "int" |
+	"boolean" | "new" | "if" | "else" | "while" | "return" | "main" |
+	"true" | "false" | "String" | "System" | "out" | "println" | "this"
+}
+
+// Tokens recognizing IDs, integers and strings.
+TOKEN:  
+{
+	<#DIGIT:  ["0"-"9"]> |
+	<#LETTER: ["A"-"Z"]|["a"-"z"]> |
+	<ID:      (<LETTER>)(<LETTER>|<DIGIT>)*> { Lexer1.tknName = "ID"; } |
+	<INTLIT:  (<DIGIT>)+>  { Lexer1.tknName = "INTLIT"; } |
+	<STRLIT:  ("\"" (~["\"", "\r", "\n"])* "\"")> { Lexer1.tknName = "STRLIT"; }
+}
+
+// Operators.
+TOKEN:
+{
+	"+" | "-" | "*" | "/" | "&&" | "||" | "!" | "==" | "!=" | "<" |
+	"<=" | ">" | ">="
+}
+
+// Delimiters.
+TOKEN: // delimiters
+{
+	"=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
 }

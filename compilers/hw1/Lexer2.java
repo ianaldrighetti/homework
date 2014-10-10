@@ -474,6 +474,8 @@ public class Lexer2 implements mjTokenConstants
 			strBuffer.append((char)c);
 		}
 		
+		//todo: unterminated error
+		
 		return new Token(STRLIT, lineNumber, originalColumnNumber, strBuffer.toString());
     }
     
