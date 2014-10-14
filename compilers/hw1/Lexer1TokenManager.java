@@ -766,6 +766,7 @@ public static Token getNextToken()
         }
         else
         {
+           SkipLexicalActions(null);
          if (jjnewLexState[jjmatchedKind] != -1)
            curLexState = jjnewLexState[jjmatchedKind];
            continue EOFLoop;
@@ -794,6 +795,22 @@ public static Token getNextToken()
   }
 }
 
+static void SkipLexicalActions(Token matchedToken)
+{
+   switch(jjmatchedKind)
+   {
+      case 6 :
+         image.append(input_stream.GetSuffix(jjimageLen + (lengthOfMatch = jjmatchedPos + 1)));
+                 Lexer1.state = Lexer1.MULTILINE_COMMENT;
+         break;
+      case 7 :
+         image.append(input_stream.GetSuffix(jjimageLen + (lengthOfMatch = jjmatchedPos + 1)));
+                 Lexer1.state = Lexer1.DEFAULT;
+         break;
+      default :
+         break;
+   }
+}
 static void TokenLexicalActions(Token matchedToken)
 {
    switch(jjmatchedKind)

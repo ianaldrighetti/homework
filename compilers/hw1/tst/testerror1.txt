@@ -1,0 +1,4 @@
+System.out.println("This will work...");
+// The following line has an illegal character...
+%
+true && false

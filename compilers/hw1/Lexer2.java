@@ -145,7 +145,7 @@ public class Lexer2 implements mjTokenConstants
 		{
 			if (pos >= str.length())
 			{
-				throw new IllegalArgumentException("Attempting to set pos to " + pos + ", it is out of range (max: " + (str.length() - 1) + ").");
+				pos = str.length();
 			}
 			
 			this.pos = pos;
@@ -167,7 +167,7 @@ public class Lexer2 implements mjTokenConstants
 		}
 	}
 
-    public static void main(String[] args)
+    public static void main(String[] args) throws Exception
     {
 		if (args.length == 0)
 		{
@@ -205,6 +205,7 @@ public class Lexer2 implements mjTokenConstants
 		catch (Exception e)
 		{
 			System.err.println("ERROR: [" + e.getClass().getName() + "] " + e.getMessage());
+			throw e;
 		}
     }
     
@@ -413,7 +414,6 @@ public class Lexer2 implements mjTokenConstants
     	//done
     	else if (Character.isDigit(ch))
     	{
-    		// TODO: Remember, check it's size!
     		return getIntegerLiteral(ch, buffer);
     	}
     	//done
@@ -450,6 +450,7 @@ public class Lexer2 implements mjTokenConstants
 		StringBuilder strBuffer = new StringBuilder();
 		
 		int c;
+		boolean ended = false;
 		while((c = buffer.next()) != -1)
 		{
 			columnNumber++;
@@ -457,7 +458,6 @@ public class Lexer2 implements mjTokenConstants
 			// We do not allow \n or \r.
 			if (c == '\r')
 			{
-				// TODO: Replace with lexer error.
 				throw new LexError("Unexpected carriage return in string (strings may not contain this character).", lineNumber, columnNumber);
 			}
 			else if (c == '\n')
@@ -468,13 +468,17 @@ public class Lexer2 implements mjTokenConstants
 			// No double quotes are allowed in strings, so this is it.
 			if (c == '"')
 			{
+				ended = true;
 				break;
 			}
 		
 			strBuffer.append((char)c);
 		}
 		
-		//todo: unterminated error
+		if (!ended)
+		{
+			throw new LexError("Unterminated string.", lineNumber, originalColumnNumber);
+		}
 		
 		return new Token(STRLIT, lineNumber, originalColumnNumber, strBuffer.toString());
     }
@@ -524,13 +528,17 @@ public class Lexer2 implements mjTokenConstants
 		}
 		
 		columnNumber += strBuffer.toString().length();
-		// !!! TODO: VERIFY THIS.
+		
 		buffer.setPos(buffer.getPos() + strBuffer.toString().length() - 1);
 		return new Token(reservedMap.get(strBuffer.toString()), lineNumber, originalColumnNumber, strBuffer.toString());
     }
     
-    private void handleComment(char ch, Buffer buffer)
+    private void handleComment(char ch, Buffer buffer) throws LexError
     {
+		int originalLineNumber = lineNumber;
+		int originalColumnNumber = columnNumber;
+		
+		// Moves us passed the first /.	
 		columnNumber++;
 		
 		// This will also get passed the / as well.
@@ -554,18 +562,20 @@ public class Lexer2 implements mjTokenConstants
 				{
 					lineNumber++;
 					columnNumber = 1;
+					continue;
 				}
-				else
+				
+				if (buffer.current() == -1)
 				{
-					columnNumber++;
+					break;
 				}
+				
+				columnNumber++;
 			}
 			
 			if (!finished)
 			{
-				// !!! TODO: THROW LEXER ERROR.
-				System.err.println("FIX ME");
-				System.exit(1);
+				throw new LexError("Unterminated multiline comment.", originalLineNumber, originalColumnNumber);
 			}
 			
 			return;

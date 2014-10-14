@@ -1,0 +1,2 @@
+!!! miniJava Lexical Error: The integer 2147483648 is too large (must not be larger than 2^31 - 1).
+    Line: 2, column: 1

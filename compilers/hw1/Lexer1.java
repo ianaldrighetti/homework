@@ -2,7 +2,10 @@
 import java.io.FileInputStream;
 
 public class Lexer1 implements Lexer1Constants {
+        public static final int DEFAULT = 0;
+        public static final int MULTILINE_COMMENT = 1;
         public static String tknName = null;    // an ad hoc token name solution
+        public static int state = 0;
 
         public static void main(String args[])
         {
@@ -20,6 +23,12 @@ public class Lexer1 implements Lexer1Constants {
                                 tknName = null;         // reset for next token
                                 tkn = lexer.getNextToken();
                         }
+
+                        if (state != DEFAULT)
+                        {
+                                throw new TokenMgrError("Unterminted multiline comment.", 0);
+                        }
+
                         System.out.println("Total: " + tknCnt + " tokens");
                         stream.close();
                 }
@@ -46,7 +55,7 @@ public class Lexer1 implements Lexer1Constants {
                         }
                         catch (NumberFormatException e)
                         {
-                                throw new TokenMgrError("Integer overflow: " + tkn.image, 0);
+                                throw new TokenMgrError("Integer overflow: " + tkn.image + ". Maximum value: 2^31 - 1.", 0);
                         }
                 }
                 else
