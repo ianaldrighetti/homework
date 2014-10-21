@@ -2,59 +2,66 @@
 # http://mdaines.github.io/grammophone/
 
 Program -> ClassDecl $ .
+
 ClassDecl -> "class" ID ["extends" ID] "{" VarDecl MethodDecl "}" .
+
 MethodDecl -> "public" MethodDecl' .
-MethodDecl' -> ExtType ID "(" [Param ["," Param]] ")" "{" VarDecl Stmt "}" .
-MethodDecl' -> "static" "void" "main" "(" "String" "[" "]" ID ")" "{" VarDecl Stmt "}" .
+
+MethodDecl' -> ExtType ID "(" [Param ["," Param]] ")" "{" VarDecl Stmt "}" 
+	| "static" "void" "main" "(" "String" "[" "]" ID ")" "{" VarDecl Stmt "}" .
+
 Param -> Type ID .
+
 VarDecl -> Type ID ["=" InitExpr] ";" .
-ExtType -> Type .
-ExtType -> "void" .
-Type -> ID .
-Type -> BasicType Type' .
-Type' -> "[" "]" .
-Type' -> .
-BasicType -> "int" .
-BasicType -> "boolean" .
+
+ExtType -> Type 
+	| "void" .
+
+Type -> ID 
+	| BasicType Type' .
+	
+Type' -> "[" "]" 
+	| .
+
+BasicType -> "int" | "boolean" .
+
 Stmt -> "{" Stmt "}" .
-Stmt -> ExtId "(" [Args] ")" ";" .
-Stmt -> Lvalue "=" InitExpr ";" .
-Stmt -> "if" "(" Expr ")" Stmt ["else" Stmt] .
-Stmt -> "while" "(" Expr ")" Stmt .
-Stmt -> "System" "PERIOD" "out" "PERIOD" "println" "(" [PrintArg] ")" ";" .
-Stmt -> "return" [Expr] ";" .
+	| ExtId "(" [Args] ")" ";" 
+	| Lvalue "=" InitExpr ";" 
+	| "if" "(" Expr ")" Stmt ["else" Stmt] 
+	| "while" "(" Expr ")" Stmt 
+	| "System" "PERIOD" "out" "PERIOD" "println" "(" [PrintArg] ")" ";" 
+	| "return" [Expr] ";" .
+
 Args -> Expr ["," Expr] .
-PrintArg -> Expr .
-PrintArg -> STRLIT .
-InitExpr -> "new" InitExpr' .
-InitExpr' -> BasicType "[" INTLIT "]" .
-InitExpr' -> ID "(" ")" .
-InitExpr -> Expr .
-Expr -> UnOp Expr Expr' .
-Expr -> "(" Expr ")" Expr' .
-Expr -> ExtId "(" [Args] ")" Expr' .
-Expr -> Lvalue Expr' .
-Expr -> Literal Expr' .
-Expr' -> BinOp Expr Expr' .
-Expr' -> .
+
+PrintArg -> Expr | STRLIT .
+
+InitExpr -> "new" InitExpr' 
+	| Expr .
+
+InitExpr' -> BasicType "[" INTLIT "]" 
+	| ID "(" ")" .
+
+Expr -> UnOp Expr Expr' 
+	| "(" Expr ")" Expr' 
+	| ExtId "(" [Args] ")" Expr' 
+	| Lvalue Expr' 
+	| Literal Expr' .
+	
+Expr' -> BinOp Expr Expr' 
+	| .
+
 Lvalue -> ExtId Lvalue' .
+
 Lvalue' -> "[" Expr "]" .
-Lvalue' -> .
+	| .
+
 ExtId -> ["this" "PERIOD"] ID ["PERIOD" ID] .
-Literal -> INTLIT .
-Literal -> "true" .
-Literal -> "false" .
-BinOp -> "+" .
-BinOp -> "-" .
-BinOp -> "*" .
-BinOp -> "/" .
-BinOp -> "&&" .
-BinOp -> "OROP" .
-BinOp -> "==" .
-BinOp -> "!=" .
-BinOp -> "<" .
-BinOp -> "<=" .
-BinOp -> ">" .
-BinOp -> ">=" .
-UnOp -> "-" .
-UnOp -> "!" .
+
+Literal -> INTLIT | "true" | "false" .
+
+BinOp -> "+" | "-" | "*" | "/" | "&&" | "OROP"
+	| "==" | "!=" | "<" | "<=" | ">" | ">=" .
+
+UnOp -> "-" | "!" .

@@ -1,0 +1,45 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// A left-recursive grammar.
+//
+
+PARSER_BEGIN(Grammar1b)
+public class Grammar1b {
+  public static void main(String args[]) {
+    try {
+      Grammar1b parser = new Grammar1b(System.in); 
+      parser.E0(); 
+    } catch (ParseException e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  } 
+}
+PARSER_END(Grammar1b)
+
+// TOKEN DEFINITIONS
+
+SKIP:  { " " | "\t" | "\n" | "\r" | "\f" }
+
+TOKEN: { <ID: (["A"-"Z"]|["a"-"z"])+> }
+
+// GRAMMAR RULES
+
+// E0 -> E $  	/* augmented production */
+//
+void E0(): {}
+{ 
+  E() <EOF>
+}
+
+// E -> E E + | E E - | id
+//
+void E(): {}
+{ 
+  E() E() "+" | E() E() "-" | <ID>
+}

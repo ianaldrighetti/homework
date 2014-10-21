@@ -1,0 +1,45 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// A simple grammar.
+//
+
+PARSER_BEGIN(Grammar1a)
+public class Grammar1a {
+  public static void main(String args[]) {
+    try {
+      Grammar1a parser = new Grammar1a(System.in); 
+      parser.E0(); 
+    } catch (ParseException e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  } 
+}
+PARSER_END(Grammar1a)
+
+// TOKEN DEFINITIONS
+
+SKIP:  { " " | "\t" | "\n" | "\r" | "\f" }
+
+TOKEN: { <ID: (["A"-"Z"]|["a"-"z"])+> }
+
+// GRAMMAR RULES
+
+// E0 -> E $  	/* augmented production */
+//
+void E0(): {}
+{ 
+  E() <EOF>
+}
+
+// E -> + E E | - E E | id
+//
+void E(): {}
+{ 
+  "+" E() E() | "-" E() E() | <ID>
+}

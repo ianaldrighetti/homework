@@ -1,0 +1,58 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// A Non-LL(1) grammar.
+//
+
+PARSER_BEGIN(Grammar2)
+public class Grammar2 {
+  public static void main(String args[]) {
+    try {
+      Grammar2 parser = new Grammar2(System.in); 
+      parser.S0(); 
+    } catch (ParseException e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  } 
+}
+PARSER_END(Grammar2)
+
+// TOKEN DEFINITIONS
+
+SKIP:  { " " | "\t" | "\n" | "\r" | "\f" }
+
+// GRAMMAR RULES
+
+// S0 -> S $  	/* augmented production */
+//
+void S0(): {}
+{ 
+  S() <EOF>
+}
+
+// S -> A B
+//
+void S(): {}
+{ 
+  A() B()
+}
+
+// A -> a A |
+//
+void A(): {}
+{ 
+  [ "a" A() ]
+}
+
+
+// B -> b B | b | ( S )
+// 
+void B(): {}
+{ 
+  "b" B() | "b" | "(" S() ")"
+}
