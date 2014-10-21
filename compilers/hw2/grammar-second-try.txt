@@ -1,0 +1,67 @@
+Program -> ClassDecl $ .
+
+ClassDecl -> "class" ID ["extends" ID] "{" VarDecl MethodDecl "}" .
+	
+MethodDecl -> "public" MethodDecl' .
+
+MethodDecl' -> ExtType ID "(" [Param ["," Param]] ")" MethodBody
+	| "static" "void" "main" "(" "String" "[" "]" ID ")" MethodBody .
+	
+MethodBody -> "{" VarDecl Stmt "}" .
+
+Param -> Type ID .
+
+VarDecl -> Type ID ["=" InitExpr] ";" .
+
+ExtType -> Type | "void" .
+
+Type -> ID | BasicType Type' .
+
+Type' -> "[" "]" | .
+
+BasicType -> "int" | "boolean" .
+
+Stmt -> "{" Stmt "}"
+	| ExtId "(" [Args] ")" ";" 
+	| Lvalue "=" InitExpr ";"
+	| "if" "(" Expr ")" Stmt ["else" Stmt]
+	| "while" "(" Expr ")" Stmt
+	| "System" "PERIOD" "out" "PERIOD" "println"
+	"(" [PrintArg] ")" ";"
+	| "return" [Expr] ";" .
+
+Args -> Expr ["," Expr] .
+
+PrintArg -> Expr | STRLIT .
+
+InitExpr -> Expr
+	| "new" InitExpr' .
+
+InitExpr' -> BasicType "[" INTLIT "]"
+	| ID "(" ")" .
+
+# LL(1) ENDS HERE
+
+Expr -> Expr BinExpr
+	| UnOp Expr
+	| "(" Expr ")"
+	| ExtId "(" [Args] ")"
+	| Lvalue
+	| Literal .
+
+BinExpr -> BinOp Expr
+	| BinOp Expr Expr .
+
+Lvalue -> ExtId Lvalue' .
+
+Lvalue' -> "[" Expr "]" | .
+
+
+ExtId -> ["this" "PERIOD"] ID ["PERIOD" ID] .
+
+Literal -> INTLIT | "true" | "false" .
+
+BinOp -> "+" | "-" | "*" | "/" | "OROP" | "||"
+		| "==" | "!=" | "<" | "<=" | ">" | ">=" .
+
+UnOp -> "-" | "!" .
