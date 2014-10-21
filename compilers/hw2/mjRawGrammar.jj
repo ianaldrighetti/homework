@@ -1,0 +1,253 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+//
+//----------------------------------------------------------------------
+// miniJava F14 Raw Grammar (JavaCC Specification)
+//
+// (For CS321 Fall 2014 - Jingke Li)
+//----------------------------------------------------------------------
+//
+//
+
+// options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(mjRawGrammar)
+import java.io.*;
+
+public class mjRawGrammar {
+  public static void main(String [] args) {
+    try {
+      if (args.length == 1) {
+	FileInputStream stream = new FileInputStream(args[0]);
+	new mjRawGrammar(stream).Program();
+	stream.close();
+	System.out.println("Program's syntax is valid.");
+      } else {
+	System.out.println("Need a file name as command-line argument.");
+      }
+    } catch (TokenMgrError e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  }
+}
+PARSER_END(mjRawGrammar)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"
+}
+
+SKIP : /* Comments -- multi-line form and error detection not included */
+{
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+}
+
+TOKEN : /* Keywords */
+{
+  "class" | "extends" | "static" | "public" | "void" | "int" | "boolean"
+| "new" | "this" | "if" | "else" | "while" | "return" | "main" | "String" 
+| "true" | "false" | "System" | "out" | "println" 
+}
+
+TOKEN : /* Internal tokens */
+{
+  <#DIGIT:  ["0"-"9"]>
+| <#LETTER: (["A"-"Z"]|["a"-"z"])>
+}
+
+TOKEN : /* Integer literals -- error detection not included */
+{
+  <INTLIT: (<DIGIT>)+> 
+}
+
+TOKEN : /* String literals  -- error detection not included */
+{
+  <STRLIT: ("\"" (~["\"","\n"])* "\"")>
+}
+
+TOKEN : /* Identifiers */
+{
+  <ID: <LETTER> (<LETTER>|<DIGIT>)*>
+}
+
+TOKEN : /* Operators and delimiters */
+{
+   "+" | "-" | "*" | "/" | "&&" | "||" | "!" 
+|  "==" | "!=" | "<" | "<=" | ">" | ">="
+|  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+}
+
+//
+// PARSER SECTION ---------------------------------------------------------------
+//
+
+// Program -> {ClassDecl}
+//
+void Program(): {}
+{
+  (ClassDecl())* <EOF>
+}
+
+// ClassDecl -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
+//
+void ClassDecl(): {}
+{
+  "class" <ID> ["extends" <ID>] "{" (VarDecl())* (MethodDecl())* "}"
+}
+
+// MethodDecl -> "public" ExtType <ID> "(" [Param {"," Param}] ")" 
+//                 "{" {VarDecl} {Stmt} "}"
+//            |  "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
+//                 "{" {VarDecl} {Stmt} "}" 
+// 
+void MethodDecl(): {} 
+{
+  "public" ExtType() <ID> "(" [Param() ("," Param())*] ")" 
+          "{" (VarDecl())* (Stmt())* "}"
+| "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
+          "{" (VarDecl())* (Stmt())* "}"
+}
+
+// Param -> Type <ID> 
+//
+void Param(): {} 
+{
+  Type() <ID> 
+}
+
+// VarDecl -> Type <ID> ["=" InitExpr] ";"
+//  
+void VarDecl(): {}
+{
+  Type() <ID> ["=" InitExpr()] ";"
+}
+
+// ExtType -> Type | "void"
+//
+void ExtType(): {}
+{
+  Type() | "void"
+}
+
+// Type -> BasicType 
+//      |  BasicType "[" "]" 
+//      |  <ID>
+//
+void Type(): {}
+{
+  BasicType() 
+| BasicType() "[" "]"
+| <ID>
+}
+
+// BasicType -> "int" | "boolean"
+//
+void BasicType(): {}
+{
+  "int" | "boolean"
+}
+
+// Stmt -> "{" {Stmt} "}"
+//      |  ExtId "(" [Args] ")" ";"
+//      |  Lvalue "=" InitExpr ";"
+//      |  "if" "(" Expr ")" Stmt ["else" Stmt]
+//      |  "while" "(" Expr ")" Stmt
+//      |  "System" "." "out" "." "println" "(" [PrintArg] ")" ";"
+//      |  "return" [Expr] ";"
+//
+void Stmt(): {}
+{
+  "{" (Stmt())* "}"
+| ExtId() "(" [Args()] ")" ";"
+| Lvalue() "=" InitExpr() ";"
+| "if" "(" Expr() ")" Stmt() ["else" Stmt()]
+| "while" "(" Expr() ")" Stmt()
+| "System" "." "out" "." "println" "(" [ PrintArg() ] ")" ";"  
+| "return" [Expr()] ";"
+}
+
+// Args -> Expr {"," Expr}
+//
+void Args(): {}
+{
+  Expr() ("," Expr())*
+}
+
+// PrintArg -> Expr | <STRLIT>
+//
+void PrintArg(): {}
+{
+  Expr() | <STRLIT>
+}
+
+// InitExpr -> "new" BasicType "[" <INTLIT> "]" 
+//          |  "new" <ID> "(" ")"
+//          |  Expr 
+//
+void InitExpr(): {}
+{
+  "new" BasicType() "[" <INTLIT> "]" 
+| "new" <ID> "(" ")"
+| Expr()
+}
+
+// Expr -> Expr BinOp Expr 
+//      |  UnOp Expr
+//      |  "(" Expr ")" 
+//      |  ExtId "(" [Args] ")"
+//      |  Lvalue
+//      |  Literal
+//
+void Expr(): {}
+{
+  Expr() BinOp() Expr() 
+| UnOp() Expr()
+| "(" Expr() ")" 
+| ExtId() "(" [Args()] ")"
+| Lvalue()
+| Literal()
+}
+
+// Lvalue -> ExtId "[" Expr "]"
+//        |  ExtId 
+void Lvalue(): {}
+{
+  ExtId() "[" Expr() "]"
+| ExtId()
+}
+
+// ExtId -> ["this" "."] <ID> {"." <ID>} 
+//
+void ExtId(): {}
+{
+  ["this" "."] <ID> ("." <ID>)*
+}
+
+// Literal -> <INTLIT> | "true" | "false"
+//
+void Literal(): {}
+{
+  <INTLIT> | "true" | "false"
+}
+
+// BinOp -> "+" | "-" | "*" | "/" | "&&" | "||" 
+//       |  "==" | "!=" | "<" | "<=" | ">" | ">=" 
+//
+void BinOp(): {}
+{
+  "+"  | "-"  | "*" | "/"  | "&&" | "||" 
+| "==" | "!=" | "<" | "<=" | ">"  | ">=" 
+}
+
+// UnOp -> "-" | "!"
+//
+void UnOp(): {}
+{
+  "-" | "!"
+}
