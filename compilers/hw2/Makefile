@@ -4,7 +4,8 @@
 
 JFLAGS = -g
 JC = javac
-JCC = javacc
+JCC = ../javacc-5.0/bin/javacc
+#JCC = javacc
 
 .SUFFIXES: .jj .java .class
 
@@ -16,7 +17,7 @@ JCC = javacc
 .java.class:
 	$(JC) $(JFLAGS) $*.java
 
-all:	mjParsr0
+all:	mjParser0
 
 mjParser0: mjParser0.class
 
