@@ -14,23 +14,34 @@
 PARSER_BEGIN(mjParser0)
 import java.io.*;
 
-public class mjParser0 {
-  public static void main(String [] args) {
-    try {
-      if (args.length == 1) {
-	FileInputStream stream = new FileInputStream(args[0]);
-	new mjParser0(stream).Program();
-	stream.close();
-	System.out.println("Program's syntax is valid.");
-      } else {
-	System.out.println("Need a file name as command-line argument.");
-      }
-    } catch (TokenMgrError e) {
-      System.err.println(e);
-    } catch (Exception e) {
-      System.err.println(e);
+public class mjParser0
+{
+    public static void main(String [] args) {
+        try
+        {
+            if (args.length == 1)
+            {
+                FileInputStream stream = new FileInputStream(args[0]);
+                
+                new mjParser0(stream).Program();
+                
+                stream.close();
+                System.out.println("Program's syntax is valid.");
+            }
+            else
+            {
+                System.out.println("Need a file name as command-line argument.");
+            }
+        }
+        catch (TokenMgrError e)
+        {
+            System.err.println(e);
+        }
+        catch (Exception e)
+        {
+            System.err.println(e);
+        }
     }
-  }
 }
 PARSER_END(mjParser0)
 
