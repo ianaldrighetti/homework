@@ -3,16 +3,16 @@
 
 Program -> ClassDecl $ .
 
-ClassDecl -> "class" ID ["extends" ID] "{" VarDecl MethodDecl "}" .
+ClassDecl -> "class" ID [ "extends" ID ] "{" VarDecl MethodDecl "}" .
 
 MethodDecl -> "public" MethodDecl' .
 
-MethodDecl' -> ExtType ID "(" [Param ["," Param]] ")" "{" VarDecl Stmt "}" 
+MethodDecl' -> ExtType ID "(" [ Param [ "," Param ] ] ")" "{" VarDecl Stmt "}" 
 	| "static" "void" "main" "(" "String" "[" "]" ID ")" "{" VarDecl Stmt "}" .
 
 Param -> Type ID .
 
-VarDecl -> Type ID ["=" InitExpr] ";" .
+VarDecl -> Type ID [ "=" InitExpr ] ";" .
 
 ExtType -> Type 
 	| "void" .
@@ -25,15 +25,15 @@ Type' -> "[" "]"
 
 BasicType -> "int" | "boolean" .
 
-Stmt -> "{" Stmt "}" .
-	| ExtId "(" [Args] ")" ";" 
+Stmt -> "{" Stmt "}" 
+	| ExtId "(" [ Args ] ")" ";" 
 	| Lvalue "=" InitExpr ";" 
-	| "if" "(" Expr ")" Stmt ["else" Stmt] 
+	| "if" "(" Expr ")" Stmt [ "else" Stmt ] 
 	| "while" "(" Expr ")" Stmt 
-	| "System" "PERIOD" "out" "PERIOD" "println" "(" [PrintArg] ")" ";" 
-	| "return" [Expr] ";" .
+	| "System" "PERIOD" "out" "PERIOD" "println" "(" [ PrintArg ] ")" ";" 
+	| "return" [ Expr ] ";" .
 
-Args -> Expr ["," Expr] .
+Args -> Expr [ "," Expr ] .
 
 PrintArg -> Expr | STRLIT .
 
@@ -45,7 +45,7 @@ InitExpr' -> BasicType "[" INTLIT "]"
 
 Expr -> UnOp Expr Expr' 
 	| "(" Expr ")" Expr' 
-	| ExtId "(" [Args] ")" Expr' 
+	| ExtId "(" [ Args ] ")" Expr' 
 	| Lvalue Expr' 
 	| Literal Expr' .
 	
@@ -54,10 +54,10 @@ Expr' -> BinOp Expr Expr'
 
 Lvalue -> ExtId Lvalue' .
 
-Lvalue' -> "[" Expr "]" .
+Lvalue' -> "[" Expr "]" 
 	| .
 
-ExtId -> ["this" "PERIOD"] ID ["PERIOD" ID] .
+ExtId -> [ "this" "PERIOD" ] ID [ "PERIOD" ID ] .
 
 Literal -> INTLIT | "true" | "false" .
 
@@ -65,3 +65,9 @@ BinOp -> "+" | "-" | "*" | "/" | "&&" | "OROP"
 	| "==" | "!=" | "<" | "<=" | ">" | ">=" .
 
 UnOp -> "-" | "!" .
+
+ID -> (["A" - "Z"])+ .
+
+INTLIT -> (["0" - "9"])+ .
+
+STRLIT -> "'" (~[]) "'" .

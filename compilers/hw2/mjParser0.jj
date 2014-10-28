@@ -9,7 +9,7 @@
 //
 //
 
-// options { DEBUG_PARSER=true; }  /* Show debugging info */
+// options { LOOKAHEAD=2; DEBUG_PARSER=true; }  /* Show debugging info */
 
 PARSER_BEGIN(mjParser0)
 import java.io.*;
@@ -50,7 +50,7 @@ SKIP : /* Comments -- multi-line form and error detection not included */
 
 TOKEN : /* Keywords */
 {
-  "class" | "extends" | "static" | "public" | "void" | "int" | "boolean"
+    "class" | "extends" | "static" | "public" | "void" | "int" | "boolean"
 | "new" | "this" | "if" | "else" | "while" | "return" | "main" | "String" 
 | "true" | "false" | "System" | "out" | "println" 
 }
@@ -91,163 +91,147 @@ TOKEN : /* Operators and delimiters */
 //
 void Program(): {}
 {
-  (ClassDecl())* <EOF>
+	(ClassDecl())* <EOF>
 }
 
 // ClassDecl -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
 //
 void ClassDecl(): {}
 {
-  "class" <ID> ["extends" <ID>] "{" (VarDecl())* (MethodDecl())* "}"
+	"class" <ID> ["extends" <ID>] "{" (VarDecl())* (MethodDecl())* "}"
 }
 
-// MethodDecl -> "public" ExtType <ID> "(" [Param {"," Param}] ")" 
-//                 "{" {VarDecl} {Stmt} "}"
-//            |  "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
-//                 "{" {VarDecl} {Stmt} "}" 
+// MethodDecl -> "public" MethodDecl'
 // 
 void MethodDecl(): {} 
 {
-  "public" ExtType() <ID> "(" [Param() ("," Param())*] ")" 
-          "{" (VarDecl())* (Stmt())* "}"
-| "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
-          "{" (VarDecl())* (Stmt())* "}"
+	"public" MethodDeclP()
+}
+
+// MethodDecl' -> ExtType ID "(" [Param ["," Param]] ")" MethodBody
+//	| "static" "void" "main" "(" "String" "[" "]" ID ")" MethodBody 
+void MethodDeclP(): {}
+{
+	ExtType() <ID> "(" [Param() ("," Param())*] ")" "{" MethodBody() "}"
+	| "static" "void" "main" "(" "String" "[" "]" <ID> ")" "{" MethodBody() "}"
+}
+
+// MethodBody -> "{" (VarDecl())* (Stmt())* "}"
+void MethodBody(): {}
+{	
+    (Stmt())* // todo: vardecl
+    //(VarDecl())* (Stmt())*// todo: stmt
+//"B" //LOOKAHEAD(2)
+	//"{" (VarDecl())* (Stmt())* "}"
 }
 
 // Param -> Type <ID> 
 //
 void Param(): {} 
 {
-  Type() <ID> 
+	Type() <ID> 
 }
 
-// VarDecl -> Type <ID> ["=" InitExpr] ";"
-//  
 void VarDecl(): {}
 {
-  Type() <ID> ["=" InitExpr()] ";"
+	[BasicType() ["[" "]"]] <ID> ["=" InitExpr()] ";"
 }
 
-// ExtType -> Type | "void"
-//
 void ExtType(): {}
 {
-  Type() | "void"
+	Type() | "void"
 }
 
-// Type -> BasicType 
-//      |  BasicType "[" "]" 
-//      |  <ID>
-//
-void Type(): {}
-{
-  BasicType() 
-| BasicType() "[" "]"
-| <ID>
-}
-
-// BasicType -> "int" | "boolean"
-//
-void BasicType(): {}
-{
-  "int" | "boolean"
-}
-
-// Stmt -> "{" {Stmt} "}"
-//      |  ExtId "(" [Args] ")" ";"
-//      |  Lvalue "=" InitExpr ";"
-//      |  "if" "(" Expr ")" Stmt ["else" Stmt]
-//      |  "while" "(" Expr ")" Stmt
-//      |  "System" "." "out" "." "println" "(" [PrintArg] ")" ";"
-//      |  "return" [Expr] ";"
-//
+// todo: extid ( args), lvalue
 void Stmt(): {}
 {
-  "{" (Stmt())* "}"
-| ExtId() "(" [Args()] ")" ";"
-| Lvalue() "=" InitExpr() ";"
-| "if" "(" Expr() ")" Stmt() ["else" Stmt()]
-| "while" "(" Expr() ")" Stmt()
-| "System" "." "out" "." "println" "(" [ PrintArg() ] ")" ";"  
-| "return" [Expr()] ";"
+    BlockStmt()
+    //| Type() <ID> ["=" InitExpr()] ";"
+    //| Lvalue() ["(" [Args()] ")"] ";"
+    //| Lvalue() "=" InitExpr() ";"
+    | "this" "." <ID> "=" InitExpr() ";"
+    | <ID> [["."] <ID> | "[" <INTLIT> "]"] ["(" (Args())* ")" | "=" InitExpr()] ";"
+    | [<ID> ["."] | BasicType() ["[" "]"]] <ID> ["[" <INTLIT> "]"] ["=" InitExpr()] ";"
+    | "if" "(" Expr() ")" Stmt() [LOOKAHEAD(1) "else" Stmt()]
+    | "while" "(" Expr() ")" Stmt()
+    | "System" "." "out" "." "println" "(" [PrintArg()] ")" ";"
+    | "return" [Expr()] ";"
 }
 
-// Args -> Expr {"," Expr}
-//
-void Args(): {}
+void BlockStmt(): {}
 {
-  Expr() ("," Expr())*
+	"{" (Stmt())* "}"
 }
 
-// PrintArg -> Expr | <STRLIT>
-//
 void PrintArg(): {}
 {
-  Expr() | <STRLIT>
+    Expr() | <STRLIT>
 }
 
-// InitExpr -> "new" BasicType "[" <INTLIT> "]" 
-//          |  "new" <ID> "(" ")"
-//          |  Expr 
-//
 void InitExpr(): {}
 {
-  "new" BasicType() "[" <INTLIT> "]" 
-| "new" <ID> "(" ")"
-| Expr()
+	"new" InitObjectExpr() | Expr()
 }
 
-// Expr -> Expr BinOp Expr 
-//      |  UnOp Expr
-//      |  "(" Expr ")" 
-//      |  ExtId "(" [Args] ")"
-//      |  Lvalue
-//      |  Literal
-//
+void InitObjectExpr(): {}
+{
+	BasicType() "[" <INTLIT> "]" | <ID> "(" ")"
+}
+// todo: method call
 void Expr(): {}
 {
-  Expr() BinOp() Expr() 
-| UnOp() Expr()
-| "(" Expr() ")" 
-| ExtId() "(" [Args()] ")"
-| Lvalue()
-| Literal()
+	P() (BinOp() P())*
 }
 
-// Lvalue -> ExtId "[" Expr "]"
-//        |  ExtId 
+void Args(): {}
+{
+	Expr() ("," Expr())*
+}
+
+void P(): {}
+{
+	Value() | "(" Expr() ")" | UnOp() P()
+}
+
+void Value(): {}
+{
+	Literal() | Lvalue() ["(" (Args())* ")"]
+}
+
 void Lvalue(): {}
 {
-  ExtId() "[" Expr() "]"
-| ExtId()
+	ExtId() //maybe OR this with VALUE's lvalue?
 }
 
-// ExtId -> ["this" "."] <ID> {"." <ID>} 
-//
 void ExtId(): {}
 {
-  ["this" "."] <ID> ("." <ID>)*
+    ["this" "."] <ID> ("." <ID>)* ["[" Expr() "]"] // may need to move
+	// this out to the proper calls (Lvalue including)
 }
 
-// Literal -> <INTLIT> | "true" | "false"
-//
+void Type(): {}
+{
+    <ID> | BasicType() ["[" "]"]
+	//<ID> | BasicType() ["[" "]"]
+}
+
+void BasicType(): {}
+{
+	"int" | "boolean"
+}
+
 void Literal(): {}
 {
-  <INTLIT> | "true" | "false"
+	<INTLIT> | "true" | "false"
 }
 
-// BinOp -> "+" | "-" | "*" | "/" | "&&" | "||" 
-//       |  "==" | "!=" | "<" | "<=" | ">" | ">=" 
-//
 void BinOp(): {}
 {
-  "+"  | "-"  | "*" | "/"  | "&&" | "||" 
-| "==" | "!=" | "<" | "<=" | ">"  | ">=" 
+	"+" | "-" | "*" | "/" | "&&" | "||"
+	| "==" | "!=" | "<" | "<=" | ">" | ">="
 }
 
-// UnOp -> "-" | "!"
-//
 void UnOp(): {}
 {
-  "-" | "!"
+	"-" | "!"
 }
