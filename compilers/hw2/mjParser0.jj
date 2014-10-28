@@ -9,7 +9,7 @@
 //
 //
 
-// options { LOOKAHEAD=2; DEBUG_PARSER=true; }  /* Show debugging info */
+// options { DEBUG_PARSER=true; }  /* Show debugging info */
 
 PARSER_BEGIN(mjParser0)
 import java.io.*;
@@ -40,47 +40,47 @@ PARSER_END(mjParser0)
 
 SKIP : /* White space */
 {
-  " " | "\t" | "\n" | "\r" | "\f"
+    " " | "\t" | "\n" | "\r" | "\f"
 }
 
 SKIP : /* Comments -- multi-line form and error detection not included */
 {
-  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+    <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
 }
 
 TOKEN : /* Keywords */
 {
     "class" | "extends" | "static" | "public" | "void" | "int" | "boolean"
-| "new" | "this" | "if" | "else" | "while" | "return" | "main" | "String" 
-| "true" | "false" | "System" | "out" | "println" 
+    | "new" | "this" | "if" | "else" | "while" | "return" | "main" | "String" 
+    | "true" | "false" | "System" | "out" | "println" 
 }
 
 TOKEN : /* Internal tokens */
 {
-  <#DIGIT:  ["0"-"9"]>
-| <#LETTER: (["A"-"Z"]|["a"-"z"])>
+    <#DIGIT:  ["0"-"9"]>
+    | <#LETTER: (["A"-"Z"]|["a"-"z"])>
 }
 
 TOKEN : /* Integer literals -- error detection not included */
 {
-  <INTLIT: (<DIGIT>)+> 
+    <INTLIT: (<DIGIT>)+> 
 }
 
 TOKEN : /* String literals  -- error detection not included */
 {
-  <STRLIT: ("\"" (~["\"","\n"])* "\"")>
+    <STRLIT: ("\"" (~["\"","\n"])* "\"")>
 }
 
 TOKEN : /* Identifiers */
 {
-  <ID: <LETTER> (<LETTER>|<DIGIT>)*>
+    <ID: <LETTER> (<LETTER> | <DIGIT>)*>
 }
 
 TOKEN : /* Operators and delimiters */
 {
-   "+" | "-" | "*" | "/" | "&&" | "||" | "!" 
-|  "==" | "!=" | "<" | "<=" | ">" | ">="
-|  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+    "+" | "-" | "*" | "/" | "&&" | "||" | "!" 
+    |  "==" | "!=" | "<" | "<=" | ">" | ">="
+    |  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
 }
 
 //
@@ -101,91 +101,80 @@ void ClassDecl(): {}
 	"class" <ID> ["extends" <ID>] "{" (VarDecl())* (MethodDecl())* "}"
 }
 
-// MethodDecl -> "public" MethodDecl'
+// MethodDecl -> "public" MethodDeclName MethodBody
 // 
 void MethodDecl(): {} 
 {
-	"public" MethodDeclP()
+	"public" MethodDeclName() MethodBody()
 }
 
-// MethodDecl' -> ExtType ID "(" [Param ["," Param]] ")" MethodBody
-//	| "static" "void" "main" "(" "String" "[" "]" ID ")" MethodBody 
-void MethodDeclP(): {}
+// MethodDeclName -> ExtType ID "(" [Param ["," Param]] ")"
+//	                | "static" "void" "main" "(" "String" "[" "]" ID ")" 
+void MethodDeclName(): {}
 {
-	ExtType() <ID> "(" [Param() ("," Param())*] ")" "{" MethodBody() "}"
-	| "static" "void" "main" "(" "String" "[" "]" <ID> ")" "{" MethodBody() "}"
+	ExtType() <ID> "(" [Param() ("," Param())*] ")"
+	| "static" "void" "main" "(" "String" "[" "]" <ID> ")"
 }
 
-// MethodBody -> "{" (VarDecl())* (Stmt())* "}"
+// MethodBody -> "{" {VarDecl} {Stmt} "}"
 void MethodBody(): {}
 {	
-    (Stmt())* // todo: vardecl
-    //(VarDecl())* (Stmt())*// todo: stmt
-//"B" //LOOKAHEAD(2)
-	//"{" (VarDecl())* (Stmt())* "}"
+    "{" (LOOKAHEAD(2) VarDecl())* (Stmt())* "}"
 }
 
 // Param -> Type <ID> 
-//
 void Param(): {} 
 {
 	Type() <ID> 
 }
 
+// VarDecl -> Type <ID> ["=" InitExpr()] ";"
 void VarDecl(): {}
 {
-	[BasicType() ["[" "]"]] <ID> ["=" InitExpr()] ";"
+	Type() <ID> ["=" InitExpr()] ";"
 }
 
+// ExtType -> "void" | Type
 void ExtType(): {}
 {
 	Type() | "void"
 }
 
-// todo: extid ( args), lvalue
+// todo: translate to grammar
 void Stmt(): {}
 {
-    BlockStmt()
-    //| Type() <ID> ["=" InitExpr()] ";"
-    //| Lvalue() ["(" [Args()] ")"] ";"
-    //| Lvalue() "=" InitExpr() ";"
-    | "this" "." <ID> "=" InitExpr() ";"
-    | <ID> [["."] <ID> | "[" <INTLIT> "]"] ["(" (Args())* ")" | "=" InitExpr()] ";"
-    | [<ID> ["."] | BasicType() ["[" "]"]] <ID> ["[" <INTLIT> "]"] ["=" InitExpr()] ";"
+    "{" (Stmt())* "}" // block it?
+    | ExtId() ("(" [Args()] ")" | ["[" Expr() "]"] "=" InitExpr()) ";"
     | "if" "(" Expr() ")" Stmt() [LOOKAHEAD(1) "else" Stmt()]
     | "while" "(" Expr() ")" Stmt()
-    | "System" "." "out" "." "println" "(" [PrintArg()] ")" ";"
+    | "System.out.println" "(" [PrintArg()] ")" ";" // todo: tokenize?
     | "return" [Expr()] ";"
 }
 
-void BlockStmt(): {}
+// Args -> Expr {"," Expr}
+void Args(): {}
 {
-	"{" (Stmt())* "}"
+    Expr() ("," Expr())*
 }
 
+// PrintArg -> Expr | STRLIT
 void PrintArg(): {}
 {
     Expr() | <STRLIT>
 }
 
+// InitExpr -> "new" (BasicType "[" INTLIT "]" | ID "(" [Args] ")")
+//             | Expr
 void InitExpr(): {}
 {
-	"new" InitObjectExpr() | Expr()
+    "new" (BasicType() "[" <INTLIT> "]" | <ID> "(" [Args()] ")")
+    | Expr()
 }
 
-void InitObjectExpr(): {}
-{
-	BasicType() "[" <INTLIT> "]" | <ID> "(" ")"
-}
-// todo: method call
+// todo: verify this
 void Expr(): {}
 {
 	P() (BinOp() P())*
-}
-
-void Args(): {}
-{
-	Expr() ("," Expr())*
 }
 
 void P(): {}
@@ -195,26 +184,27 @@ void P(): {}
 
 void Value(): {}
 {
-	Literal() | Lvalue() ["(" (Args())* ")"]
+	Literal() | Lvalue() ["(" (Args())* ")"]// todo: not right
 }
 
 void Lvalue(): {}
 {
-	ExtId() //maybe OR this with VALUE's lvalue?
+	ExtId() ["(" [Args()] ")" | "[" Expr() "]"]
 }
 
 void ExtId(): {}
 {
-    ["this" "."] <ID> ("." <ID>)* ["[" Expr() "]"] // may need to move
-	// this out to the proper calls (Lvalue including)
+    <ID> ("." <ID>)* | "this" "." <ID> ("." <ID>)*
 }
 
+// Type -> BasicType ["[" "]"]
 void Type(): {}
 {
     <ID> | BasicType() ["[" "]"]
-	//<ID> | BasicType() ["[" "]"]
 }
 
+
+// BasicType -> "int" | "boolean"
 void BasicType(): {}
 {
 	"int" | "boolean"

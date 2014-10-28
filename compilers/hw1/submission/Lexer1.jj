@@ -1,0 +1,154 @@
+//----------------------------------------------------------------------
+// CS321 Assignment 1 (Fall 2014)
+//
+// miniJava Lexer1 (JavaCC Specification)
+//
+// By Ian Aldrighetti (aldrig@pdx.edu)
+//----------------------------------------------------------------------
+
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+//
+// (For CS321 Fall 2014 - Jingke Li)
+//
+
+// File Input.
+//
+// Notes:
+//  1. We can also use "FileReader" instead of "FileInputStream".
+//
+
+PARSER_BEGIN(Lexer1)
+import java.io.*;
+
+public class Lexer1
+{
+	public static final int DEFAULT = 0;
+	public static final int MULTILINE_COMMENT = 1;
+	public static String tknName = null;	// an ad hoc token name solution
+	public static int state = 0;
+
+	public static void main(String args[])
+	{
+		try
+		{
+			FileInputStream stream = null;
+			if (args.length == 1) 
+			{
+				stream = new FileInputStream(args[0]);
+			}
+			else
+			{
+				throw new Exception("The program should must be passed 1 argument -- the file name.");
+			}
+			
+			Lexer1 lexer = new Lexer1(stream);
+			Token tkn = lexer.getNextToken();
+			int tknCnt = 0;
+			while (tkn.kind != 0)
+			{
+				displayToken(tkn);
+
+				tknCnt++;
+				tknName = null;	      	// reset for next token
+				tkn = lexer.getNextToken();
+			}
+			
+			if (state != DEFAULT)
+			{
+				throw new TokenMgrError("Unterminted multiline comment.", 0);
+			}
+			
+			System.out.println("Total: " + tknCnt + " tokens");
+			stream.close();
+		}
+		catch (TokenMgrError e)
+		{
+			System.err.println("ERROR: " + e.getMessage());
+		}
+		catch (FileNotFoundException e)
+		{
+			System.err.println("ERROR: The file \"" + args[0] + "\" was not found.");
+		}
+		catch (Exception e)
+		{
+			System.err.println("ERROR: " + e.getMessage());
+		}
+	}
+
+	private static void displayToken(Token tkn)
+	{
+		System.out.print("(" + tkn.beginLine + "," + tkn.beginColumn + ")");
+		System.out.print("\t" + (tknName == null ? "" : tknName + "("));
+
+		if (tkn.kind == INTLIT)
+		{
+			try
+			{
+				System.out.print(Integer.parseInt(tkn.image));
+			}
+			catch (NumberFormatException e)
+			{
+				throw new TokenMgrError("Integer overflow: " + tkn.image + ". Maximum value: 2^31 - 1.", 0);
+			}
+		}
+		else
+		{
+			System.out.print(tkn.image);
+		}
+
+		System.out.println((tknName != null ? ")" : ""));
+	}
+}
+PARSER_END(Lexer1)
+
+// Ignore whitespace, tabs, carriage returns and new lines.
+SKIP:
+{
+	" " | "\t" | "\n" | "\r"
+}
+
+// Skip comments, single and multiline.
+SKIP:
+{
+	<"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> |
+	<"/*"> { Lexer1.state = Lexer1.MULTILINE_COMMENT; }: MULTILINE_COMMENT
+}
+
+// Skips characters within comments.
+<MULTILINE_COMMENT> SKIP:
+{
+	<"*/"> { Lexer1.state = Lexer1.DEFAULT; }: DEFAULT |
+	<~[]>
+}
+
+// Reserved words.
+TOKEN:
+{
+	"class" | "extends" | "static" | "public" | "void" | "int" |
+	"boolean" | "new" | "if" | "else" | "while" | "return" | "main" |
+	"true" | "false" | "String" | "System" | "out" | "println" | "this"
+}
+
+// Tokens recognizing IDs, integers and strings.
+TOKEN:  
+{
+	<#DIGIT:  ["0"-"9"]> |
+	<#LETTER: ["A"-"Z"]|["a"-"z"]> |
+	<ID:      (<LETTER>)(<LETTER>|<DIGIT>)*> { Lexer1.tknName = "ID"; } |
+	<INTLIT:  (<DIGIT>)+>  { Lexer1.tknName = "INTLIT"; } |
+	<STRLIT:  ("\"" (~["\"", "\r", "\n"])* "\"")> { Lexer1.tknName = "STRLIT"; }
+}
+
+// Operators.
+TOKEN:
+{
+	"+" | "-" | "*" | "/" | "&&" | "||" | "!" | "==" | "!=" | "<" |
+	"<=" | ">" | ">="
+}
+
+// Delimiters.
+TOKEN: // delimiters
+{
+	"=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+}

@@ -1,0 +1,275 @@
+
+
+// options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(mjGrammarLL)
+import java.io.*;
+
+public class mjGrammarLL {
+  public static void main(String [] args) {
+    try {
+      if (args.length == 1) {
+	FileInputStream stream = new FileInputStream(args[0]);
+	new mjGrammarLL(stream).Program();
+	stream.close();
+	System.out.println("Program's syntax is valid.");
+      } else {
+	System.out.println("Need a file name as command-line argument.");
+      }
+    } catch (TokenMgrError e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  }
+}
+PARSER_END(mjGrammarLL)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"
+}
+
+SKIP : /* Comments */
+{
+  <SLComment:    "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>
+| <MLComment:    "/*" ( ~["*"] | (["*"])+ (~["/"]) )* (["*"])+ "/">
+| <Unterminated: "/*" ( ~["*"] | (["*"])+ (~["/"]) )* (["*"])+ >
+    { if (true) throw new TokenMgrError("Unterminated multi-line comments ", 0); }  
+}
+
+TOKEN : /* Keywords */
+{
+  <kwBoolean: "boolean">   
+| <kwClass:   "class">
+| <kwElse:    "else">
+| <kwExtends: "extends">
+| <kwIf:      "if">
+| <kwInt:     "int">
+| <kwMain:    "main">
+| <kwNew:     "new">
+| <kwPublic:  "public">
+| <kwReturn:  "return">
+| <kwStatic:  "static">
+| <kwString:  "String">
+| <kwPrint:   "System.out.println">
+| <kwThis:    "this">
+| <kwVoid:    "void">         
+| <kwWhile:   "while">
+| <#Digit:    ["0"-"9"]>
+| <#Letter:   (["A"-"Z"]|["a"-"z"])>
+}
+
+TOKEN : /* BoolLit */
+{
+  <BoolLit: "true"|"false">
+}
+
+TOKEN : /* IntLit */
+{
+  <IntLit: (<Digit>)+> 
+  { try { 
+      Integer.parseInt(matchedToken.image); 
+    } catch (Exception e) { 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Integer overflow: " + matchedToken.image, 0);
+    } 
+  }
+}
+
+TOKEN : /* StrLit */
+{
+  <StrLit: ("\"" (~["\"","\n"])+ "\"")>
+  { if (matchedToken.image.length() > 257) 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". String length over 255: " + matchedToken.image, 0); 
+  }
+}
+
+TOKEN : /* Id */
+{
+  <Id: <Letter> (<Letter>|<Digit>|"_")*>
+  { if (matchedToken.image.length() > 255) 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Id length over 255: " + matchedToken.image, 0);
+  }
+}
+
+//
+// PARSER SECTION ---------------------------------------------------------------
+//
+
+// Program -> {ClassDecl}
+//
+void Program(): {}
+{
+  (ClassDecl())* <EOF>
+}
+
+// ClassDecl -> "class" <Id> ["extends" <Id>] "{" {VarDecl} {MethodDecl} "}"
+//
+void ClassDecl(): {}
+{
+  "class" <Id> ["extends" <Id>] "{" (VarDecl())* (MethodDecl())* "}"
+}
+
+// MethodDecl -> "public" MethodDecl_0 "{" (LOOKAHEAD(2) {VarDecl} {Stmt} "}
+void MethodDecl(): {} 
+{
+  "public" MethodDecl_0() "{" (LOOKAHEAD(2) VarDecl())* (Stmt())* "}"
+}
+
+// MethodDecl_0 -> ExtType <Id> "(" {Formals()} ")" 
+//              | "static" "void" "main" "(" "String" "[" "]" <Id> ")"
+void MethodDecl_0(): {}
+{
+  ExtType() <Id> "(" [Formals()] ")" 
+| "static" "void" "main" "(" "String" "[" "]" <Id> ")"
+}
+
+// Formals -> Type <Id> {"," Type <Id>}
+//
+void Formals(): {} 
+{
+  Type() <Id> ("," Type() <Id>)*
+}
+
+// VarDecl -> Type <Id> ["=" InitExpr] ";"
+//  
+void VarDecl(): {}
+{
+  Type() <Id> ["=" InitExpr()] ";"
+}
+
+// ExtType -> "void" | Type
+//
+void ExtType(): {}
+{
+  "void" | Type()
+}
+
+// Type -> BasicType ["[" "]"] 
+//      |  <Id>
+
+void Type(): {}
+{
+  BasicType() ["[" "]"] 
+| <Id>
+}
+
+// BasicType -> "int" | "boolean"
+//
+void BasicType(): {}
+{
+  "int" | "boolean"
+}
+
+// Stmt -> "{" {Stmt} "}"
+//      |  ExtId "(" [Args] ")" ";" | ["[" Expr "]"] "=" InitExpr ";"
+//      |  "if" "(" Expr ")" Stmt ["else" Stmt]
+//      |  "while" "(" Expr ")" Stmt
+//      |  "System.out.println" "(" [PrintArg] ")" ";"
+//      |  "return" [Expr] ";"
+//
+void Stmt(): {}
+{
+  "{" (Stmt())* "}"
+| ExtId() ("(" [Args()] ")" ";" | ["[" Expr() "]"] "=" InitExpr() ";")
+| "if" "(" Expr() ")" Stmt() ["else" Stmt()]
+| "while" "(" Expr() ")" Stmt()
+| "System.out.println" "(" [PrintArg()] ")" ";"
+| "return" [Expr()] ";"
+}
+
+// Args -> Expr {"," Expr}
+//
+void Args(): {}
+{
+  Expr() ("," Expr())*
+}
+
+// PrintArg -> Expr | <StrLit>
+void PrintArg(): {}
+{
+  Expr() | <StrLit>
+}
+
+// InitExpr -> "new" ( BasicType "[" <IntLit> "]" | <Id> "(" [Args] ")" )
+//          |  Expr 
+//
+void InitExpr(): {}
+{
+  "new" (BasicType() "[" <IntLit> "]" | <Id> "(" [Args()] ")")
+| Expr()
+}
+
+// Expr -> Expr_1 {"||" Expr_1}*
+void Expr(): {}
+{
+  Expr_1() ("||" Expr_1())*
+}
+
+// Expr_1 -> Expr_2 {"&&" Expr_2}*
+void Expr_1(): {}
+{
+  Expr_2() ("&&" Expr_2())*
+}
+
+// Expr_2 -> Expr_3 {CompOp() Expr_3}*
+void Expr_2(): {}
+{
+  Expr_3() (CompOp() Expr_3())*
+}
+
+// Expr_3 -> Expr_4 {("+" | "-") Expr_4}*
+void Expr_3(): {}
+{
+  Expr_4() (("+" | "-") Expr_4())*
+}
+
+// Expr_4  -> Expr_5 {("*" | "/") Expr_5)}
+void Expr_4(): {}
+{
+  Expr_5() (("*" | "/") Expr_5())*
+}
+
+// Expr_5 ->  {"-" | "!"} Expr_6
+void Expr_5(): {}
+{
+  ("-" | "!")* Expr_6()
+}
+
+// Expr_6 -> "(" Expr ")"
+//        | ExtId  ( "(" [Args] ")" | "[" Expr "]" )
+//        | <IntLit>
+//        | <BoolLit>
+//
+void Expr_6(): {}
+{
+  "(" Expr() ")"
+| ExtId() [ "(" [Args()] ")" | "[" Expr() "]"  ]
+| <IntLit>
+| <BoolLit>
+}
+
+// ExtId -> <Id> ("." <Id>)*
+//          "this" "." <Id> ("." <Id>)*
+void ExtId(): {}
+{
+  <Id> ("." <Id>)*
+| "this" "." <Id> ("." <Id>)*
+}
+
+// CompOp -> "==" | "!=" | "<" | "<=" | ">"  | ">=" 
+//
+void CompOp(): {}
+{
+  "==" | "!=" | "<" | "<=" | ">"  | ">=" 
+}'

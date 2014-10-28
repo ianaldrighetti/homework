@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<title>Context-Free Grammar Analyzer</title>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script> 
+	<script src="cfg-analyzer.js"></script>
+	<style type="text/css">
+		body {
+			margin: 0;
+			height: 100%;
+		}
+		
+		#input {
+			float: left;
+			width: 200px;
+			height: 100%;
+		}
+		
+		#grammar {
+			width: 100%;
+			min-height: 300px;
+		}
+		
+		#output {
+			position: absolute;
+			left: 210px;
+			top: 0px;
+		}
+	</style>
+</head>
+<body>
+	<div id="input">
+		<textarea id="grammar"></textarea>
+		<input id="button" type="submit" value="Analyze" />
+	</div>
+	<div id="output">
+		<h1>Context-Free Grammar Analyzer</h1>
+		<div id="result">
+		</div>
+	</div>
+</body>
+</html>
