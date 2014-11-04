@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# Script for running miniJava parser tests. 
+# (For CS321 Language and Compiler Design, Portland State University.)
+#
+# Usage:
+#   ./runp tst/test01.java  -- test a single program 
+#   ./runp tst/test*.java   -- test all programs
+#
+# The script will compare your parser's output with a ref file (if exists),
+# and save the diffs in a .diff file.
+#
+
+for i
+do
+	d=`dirname $i`
+	f=`basename $i .java`
+	echo -n "$d/$f: "
+	java mjParser $d/$f.java 1> $d/$f.ast 2>$d/$f.err
+	if [ -r $d/$f.ast.ref ]; then
+          diff -w $d/$f.ast $d/$f.ast.ref > $d/$f.ast.diff; 
+          if [ -s $d/$f.ast.diff ]; then 
+            echo "differs from ref (see $f.ast.diff)"; 
+          else
+            echo "matches ref"; 
+          fi
+	else
+            echo "no ref to compare"; 
+        fi
+	if [ -s $d/$f.err ]; then cat $d/$f.err; fi
+done
+exit 0
+

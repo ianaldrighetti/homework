@@ -1,0 +1,14 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ObjType A) a (NewObj A)
+   VarDecl IntType i (Call a foo (2 ))
+   Print i
+ClassDecl A 
+  MethodDecl IntType foo ((Param IntType i) )
+   If (Binop > i 1)
+    Return (Call This bar ())
+   Else
+    Return 3
+  MethodDecl IntType bar ()
+   Return (Call This foo (1 ))

@@ -1,0 +1,22 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ObjType B) b (NewObj B)
+   Print (Call b go ())
+ClassDecl B 
+  MethodDecl IntType go ()
+   VarDecl (ObjType B2) b ()
+   Assign b (NewObj B2)
+   Return (Call b value (true ))
+ClassDecl B2 
+  VarDecl IntType i ()
+  MethodDecl IntType value ((Param BoolType cond) )
+   VarDecl IntType j ()
+   VarDecl IntType k ()
+   Assign i 5
+   Assign j 6
+   If cond
+    Assign k i
+   Else
+    Assign k j
+   Return k

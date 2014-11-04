@@ -1,0 +1,92 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+//
+//----------------------------------------------------------------------
+// miniJava (F14) LL(2) Parser (A starting version.)
+//
+// (For CS321 Fall 2014 - Jingke Li)
+//----------------------------------------------------------------------
+//
+//
+
+// options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(mjParser)
+import java.util.*;
+import java.io.*;
+import ast.*;
+
+public class mjParser {
+  public static void main(String [] args) {
+    try {
+      if (args.length == 1) {
+	FileInputStream stream = new FileInputStream(args[0]);
+	Ast.Program p = new mjParser(stream).Program();
+	stream.close();
+	System.out.print(p);
+      } else {
+	System.out.println("Need a file name as command-line argument.");
+      }
+    } catch (TokenMgrError e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  }
+}
+PARSER_END(mjParser)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"
+}
+
+SKIP : /* Comments */
+{
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>			// Single-line
+| <"/*" ( (~["*"])+ | (["*"])+ (~["*","/"]) )* (["*"])* "*/">   // Multi-line
+| <"/*" ( (~["*"])+ | (["*"])+ (~["*","/"]) )* (["*"])*>        // Non-ending
+    { if (true) throw new TokenMgrError("Unterminated block comments ", 0); }  
+}
+
+TOKEN : /* Reserved keywords */
+{
+  "class" | "extends" | "static" | "public" | "void" | "int" | "boolean"
+| "new" | "this" | "if" | "else" | "while" | "return" | "main" | "String" 
+| "true" | "false" | "System" | "out" | "println" 
+}
+
+TOKEN : /* Literals and Ids */
+{
+  <#DIGIT:  ["0"-"9"]>
+| <#LETTER: (["A"-"Z"]|["a"-"z"])>
+| <INTLIT: (<DIGIT>)+> 			/* Integer literals */
+| <STRLIT: ("\"" (~["\"","\n"])* "\"")>	/* String literals */
+| <ID: <LETTER> (<LETTER>|<DIGIT>)*>	/* Identifiers */
+}
+
+TOKEN : /* Operators and delimiters */
+{
+   "+" | "-" | "*" | "/" | "&&" | "||" | "!" 
+|  "==" | "!=" | "<" | "<=" | ">" | ">="
+|  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+}
+
+//
+// PARSER SECTION ---------------------------------------------------------------
+//
+
+// Program -> {ClassDecl}
+//
+Ast.Program Program():
+{ List<Ast.ClassDecl> cl = new ArrayList<Ast.ClassDecl>();
+  Ast.ClassDecl c; }
+{
+  ( c=ClassDecl() {cl.add(c);} )* <EOF>
+  { return new Ast.Program(cl); }
+}
+
