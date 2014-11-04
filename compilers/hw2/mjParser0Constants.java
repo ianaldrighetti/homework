@@ -79,7 +79,6 @@ public interface mjParser0Constants {
     "\"]\"",
     "\"{\"",
     "\"}\"",
-    "\"System.out.println\"",
   };
 
 }

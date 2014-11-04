@@ -1,3 +1,6 @@
+//
+// HW2 by Ian Aldrighetti (aldrig@pdx.edu)
+//
 // This is supporting software for CS321 Compilers and Language Design I
 // Copyright (c) Portland State University
 //
@@ -99,27 +102,24 @@ TOKEN : /* Operators and delimiters */
 //
 
 // Program -> {ClassDecl}
-//
 void Program(): {}
 {
 	(ClassDecl())* <EOF>
 }
 
 // ClassDecl -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
-//
 void ClassDecl(): {}
 {
 	"class" <ID> ["extends" <ID>] "{" (VarDecl())* (MethodDecl())* "}"
 }
 
-// MethodDecl -> "public" MethodDeclName MethodBody
-// 
+// MethodDecl -> "public" MethodDeclName "{" MethodBody "}"
 void MethodDecl(): {} 
 {
-	"public" MethodDeclName() MethodBody()
+	"public" MethodDeclName() "{" MethodBody() "}"
 }
 
-// MethodDeclName -> ExtType ID "(" [Param ["," Param]] ")"
+// MethodDeclName -> ExtType ID "(" [Param {"," Param}] ")"
 //	                | "static" "void" "main" "(" "String" "[" "]" ID ")" 
 void MethodDeclName(): {}
 {
@@ -127,10 +127,10 @@ void MethodDeclName(): {}
 	| "static" "void" "main" "(" "String" "[" "]" <ID> ")"
 }
 
-// MethodBody -> "{" {VarDecl} {Stmt} "}"
+// MethodBody -> {VarDecl} {Stmt}
 void MethodBody(): {}
 {	
-    "{" (LOOKAHEAD(2) VarDecl())* (Stmt())* "}"
+    (LOOKAHEAD(2) VarDecl())* (Stmt())*
 }
 
 // Param -> Type <ID> 
@@ -145,20 +145,37 @@ void VarDecl(): {}
 	Type() <ID> ["=" InitExpr()] ";"
 }
 
-// ExtType -> "void" | Type
+// ExtType -> Type | "void"
 void ExtType(): {}
 {
 	Type() | "void"
 }
 
-// todo: translate to grammar
+// Type -> <ID> | BasicType ["[" "]"]
+void Type(): {}
+{
+    <ID> | BasicType() ["[" "]"]
+}
+
+// BasicType -> "int" | "boolean"
+void BasicType(): {}
+{
+	"int" | "boolean"
+}
+
+// Stmt -> "{" {Stmt} "}"
+//         | ExtId ("(" [Args] ")" | ["[" Expr "]"] "=" InitExpr) ";"
+//         | "if" "(" Expr ")" Stmt ["else" Stmt]
+//         | "while" "(" Expr ")" Stmt
+//         | "System" "." "out" "." "println" "(" [PrintArg] ")" ";"
+//         | "return" Expr ";"
 void Stmt(): {}
 {
-    "{" (Stmt())* "}" // block it?
+    "{" (Stmt())* "}"
     | ExtId() ("(" [Args()] ")" | ["[" Expr() "]"] "=" InitExpr()) ";"
     | "if" "(" Expr() ")" Stmt() [LOOKAHEAD(1) "else" Stmt()]
     | "while" "(" Expr() ")" Stmt()
-    | "System.out.println" "(" [PrintArg()] ")" ";" // todo: tokenize?
+    | "System" "." "out" "." "println" "(" [PrintArg()] ")" ";"
     | "return" [Expr()] ";"
 }
 
@@ -182,57 +199,74 @@ void InitExpr(): {}
     | Expr()
 }
 
-// todo: verify this
+// Expr -> Conjunction {"||" Conjunction}
 void Expr(): {}
 {
-	P() (BinOp() P())*
+    Conjunction() ("||" Conjunction())*
 }
 
-void P(): {}
+// Conjunction -> CompExpr {"&&" CompExpr}
+void Conjunction(): {}
 {
-	Value() | "(" Expr() ")" | UnOp() P()
+    CompExpr() ("&&" CompExpr())*
 }
 
+// CompExpr -> AddExpr {CompOp AddExpr}
+void CompExpr(): {}
+{
+    AddExpr() (CompOp() AddExpr())*
+}
+
+// AddExpr -> MultExpr {("+" | "-") MultExpr}
+void AddExpr(): {}
+{
+    MultExpr() (("+" | "-") MultExpr())*
+}
+
+// MultExpr -> UnExpr {("*" | "/") UnExpr}
+void MultExpr(): {}
+{
+    UnExpr() (("*" | "/") UnExpr())*
+}
+
+// UnExpr -> {"-" | "!"} FinalExpr
+void UnExpr(): {}
+{
+    ("-" | "!")* FinalExpr()
+}
+
+// FinalExpr -> "(" Expr ")" | Value
+void FinalExpr(): {}
+{
+    "(" Expr() ")" | Value()
+}
+
+// Value -> Literal | Lvalue
 void Value(): {}
 {
-	Literal() | Lvalue() ["(" (Args())* ")"]// todo: not right
+	Literal() | Lvalue()
 }
 
+// Lvalue -> ExtId ["(" [Args] ")" | "[" Expr "]"]
 void Lvalue(): {}
 {
 	ExtId() ["(" [Args()] ")" | "[" Expr() "]"]
 }
 
+// ExtId -> ID {"." ID} | "this" "." ID {"." ID}
 void ExtId(): {}
 {
     <ID> ("." <ID>)* | "this" "." <ID> ("." <ID>)*
 }
 
-// Type -> BasicType ["[" "]"]
-void Type(): {}
-{
-    <ID> | BasicType() ["[" "]"]
-}
-
-
-// BasicType -> "int" | "boolean"
-void BasicType(): {}
-{
-	"int" | "boolean"
-}
-
+// Literal -> INTLIT | "true" | "false"
 void Literal(): {}
 {
 	<INTLIT> | "true" | "false"
 }
 
-void BinOp(): {}
+// CompOp -> "==" | "!=" | "<" | "<=" | ">" | ">="
+void CompOp(): {}
 {
-	"+" | "-" | "*" | "/" | "&&" | "||"
-	| "==" | "!=" | "<" | "<=" | ">" | ">="
-}
-
-void UnOp(): {}
-{
-	"-" | "!"
+    "==" | "!=" |"<" | "<=" | ">" | ">="
 }
