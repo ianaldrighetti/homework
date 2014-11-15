@@ -1,0 +1,5 @@
+ParseException: Encountered " <ID> "import "" at line 2, column 1.
+Was expecting one of:
+    <EOF> 
+    "class" ...
+    

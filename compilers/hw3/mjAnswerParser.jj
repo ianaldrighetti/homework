@@ -1,0 +1,425 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// 
+//----------------------------------------------------------------------
+// An starting program for miniJava Parser.
+//
+// For CS321 HW4, W'14
+//
+// Instructions:
+//
+// 1. Copy or rename this file to 'mjParser.jj'.
+// 2. Add parsing routines to the parser section (either copy from your 
+//    'mjGrammarLL.jj' program or convert from 'mjGrammarLL2.txt'.
+// 3. Insert semantic actions into the parsing routines.
+//----------------------------------------------------------------------
+//
+//
+
+// options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(mjParser)
+import java.util.*;
+import java.io.*;
+import ast.*;
+
+public class mjParser {
+  public static void main(String [] args) {
+    try {
+      if (args.length == 1) {
+	FileInputStream stream = new FileInputStream(args[0]);
+	Ast.Program p = new mjParser(stream).Program();
+	stream.close();
+	System.out.print(p);
+      } else {
+	System.out.print("Need a file name as command-line argument.\n");
+      }
+    } catch (TokenMgrError e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  }
+}
+PARSER_END(mjParser)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"
+}
+
+SKIP : /* Comments */
+{
+  <SLComment:    "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>
+| <MLComment:    "/*" ( ~["*"] | (["*"])+ (~["/"]) )* (["*"])+ "/">
+| <Unterminated: "/*" ( ~["*"] | (["*"])+ (~["/"]) )* (["*"])+ >
+    { if (true) throw new TokenMgrError("Unterminated multi-line comments ", 0); }  
+}
+
+TOKEN : /* Keywords */
+{
+  <kwBoolean: "boolean">   
+| <kwClass:   "class">
+| <kwElse:    "else">
+| <kwExtends: "extends">
+| <kwIf:      "if">
+| <kwInt:     "int">
+| <kwMain:    "main">
+| <kwNew:     "new">
+| <kwPublic:  "public">
+| <kwReturn:  "return">
+| <kwStatic:  "static">
+| <kwString:  "String">
+| <kwPrint:   "System.out.println">
+| <kwThis:    "this">
+| <kwVoid:    "void">         
+| <kwWhile:   "while">
+| <#Digit:    ["0"-"9"]>
+| <#Letter:   (["A"-"Z"]|["a"-"z"])>
+}
+
+TOKEN : /* BoolLit */
+{
+  <BoolLit: "true"|"false">
+}
+
+TOKEN : /* IntLit */
+{
+  <IntLit: (<Digit>)+> 
+  { try { 
+      Integer.parseInt(matchedToken.image); 
+    } catch (Exception e) { 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Integer overflow: " + matchedToken.image, 0);
+    } 
+  }
+}
+
+TOKEN : /* StrLit */
+{
+  <StrLit: ("\"" (~["\"","\n"])+ "\"")>
+  { if (matchedToken.image.length() > 257) 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". String length over 255: " + matchedToken.image, 0); 
+  }
+}
+
+TOKEN : /* Id */
+{
+  <Id: <Letter> (<Letter>|<Digit>|"_")*>
+  { if (matchedToken.image.length() > 255) 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Id length over 255: " + matchedToken.image, 0);
+  }
+}
+
+// Operators and Delimiters are not explicitly defined:
+//
+// Operators:  "="|"+"|"-"|"*"|"/"|"&&"|"||"|"!"|"=="|"!="|"<"|"<="|">"|">="
+// Delimiters: ";"|","|"."|"("|")"|"["|"]"|"{"|"}"
+//
+
+
+//
+// PARSER SECTION ---------------------------------------------------------------
+//
+
+Ast.Program Program():
+{  List<Ast.ClassDecl> c1 = new ArrayList<Ast.ClassDecl>();
+   Ast.ClassDecl c;
+   //Ast.Stmt stmt;
+}
+{
+   //stmt=Stmt() { return stmt; } <EOF>
+   ( c=ClassDecl() {c1.add(c);} )* <EOF>
+   { return new Ast.Program(c1); }
+}
+
+Ast.ClassDecl ClassDecl():
+{  Ast.Id className;
+   Ast.Id pn = null;
+   List<Ast.VarDecl> variables  = new ArrayList<Ast.VarDecl>();
+   List<Ast.MethodDecl> methods = new ArrayList<Ast.MethodDecl>();
+   
+   Ast.VarDecl variable;
+   Ast.MethodDecl method;
+}
+{
+   "class" className=Id() ["extends" pn=Id()] "{" 
+      (variable=VarDecl()   { variables.add(variable); })* 
+      (method=MethodDecl()  { methods.add(method);     })* 
+   "}"
+
+   { return new Ast.ClassDecl(className.nm, pn == null? null : pn.nm, variables, methods); }  
+}
+
+Ast.MethodDecl MethodDecl():
+{  Ast.Type t = null;
+   Ast.Id mn = null;
+   List<Ast.Param> params = new ArrayList<Ast.Param>();
+   List<Ast.VarDecl> vars = new ArrayList<Ast.VarDecl>();
+   List<Ast.Stmt> stmts = new ArrayList<Ast.Stmt>();
+
+   Ast.Param p;
+   Ast.VarDecl var;
+   Ast.Stmt stmt;
+}
+{
+   "public" (t=ExtType() mn=Id()"("[p=Param() {params.add(p);}("," p=Param() {params.add(p);})*]")"
+           | "static" "void" "main" "(" "String" "["  "]" Id() ")" )
+      "{"
+         (LOOKAHEAD(2) var=VarDecl() {vars.add(var);})* 
+         (stmt=Stmt() {stmts.add(stmt);})*
+      "}"
+   { return new Ast.MethodDecl(t, mn == null? "main" : mn.nm, params, vars, stmts); }
+}
+
+Ast.Param Param():
+{  Ast.Type type;
+   Ast.Id name;
+}
+{  type=Type() name=Id()
+   { return new Ast.Param(type, name.nm); }
+}
+
+Ast.VarDecl VarDecl():
+{  Ast.Type type;
+   Ast.Id name;
+   Ast.Exp exp = null;
+}
+{  type=Type() name=Id() ["=" exp=InitExpr()] ";"
+   { return new Ast.VarDecl(type, name.nm, exp); }  
+}
+
+Ast.Stmt Stmt():
+{  
+   List<Ast.Stmt> stmts = new ArrayList<Ast.Stmt>();
+   List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+   Ast.Stmt stmt;
+   Ast.Stmt stmt0 = null;
+   Ast.Block block;
+   Ast.Assign assign;
+   Ast.CallStmt call;
+   Ast.If ifStmt;
+   Ast.While whileStmt;
+   Ast.Print print;
+   Ast.Return returnStmt;
+
+   Ast.Exp extId;
+   Ast.Id exp1Id;
+   Ast.Field exp1F;
+   Ast.Exp exp1;
+   Ast.Exp exp2;
+   Ast.Exp exp0 = null;
+}
+{  
+   "{" (stmt=Stmt() {stmts.add(stmt);})* "}" { return new Ast.Block(stmts); } |
+   exp1=ExtId() ( ["[" exp0=Expr() "]"] "=" exp2=InitExpr() ";" {
+
+                  if (exp0 == null) {
+                     return new Ast.Assign(exp1, exp2);
+                  } else {
+                     return new Ast.Assign( new Ast.ArrayElm(exp1, exp0), exp2 );
+                  }
+}|
+                  "(" [args=Args()] ")" ";" {
+                     if (exp1 instanceof Ast.Field) {
+                        exp1F = (Ast.Field)exp1;
+                        return new Ast.CallStmt(exp1F.obj, exp1F.nm, args);
+                     } else {
+                        exp1Id = (Ast.Id)exp1;
+                        return new Ast.CallStmt(new Ast.This(), exp1Id.nm, args);
+                     }
+} ) |
+   "if" "(" exp1=Expr() ")" stmt=Stmt()  [ LOOKAHEAD(1) "else" stmt0=Stmt()] {return new
+      Ast.If(exp1, stmt, stmt0);} |
+   "while" "(" exp1=Expr() ")" stmt=Stmt() {return new Ast.While(exp1, stmt);} |
+   "System.out.println" "("[exp0=PrintArg()] ")"  ";" {return new Ast.Print(exp0);}|
+   "return" [exp0=Expr()] ";" {return new Ast.Return(exp0);}
+   
+}
+
+Ast.Exp PrintArg():
+{ Ast.Exp e; String s = null; }
+{
+   e=Expr() { return e; } | 
+   s=StrLit() { return new Ast.StrLit(s); }
+}
+
+Ast.Exp InitExpr():
+{
+   Ast.Exp e;
+   Ast.Type t;
+   Ast.Id id;
+   int idx;
+   List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+}
+{
+   ( "new" ( t=BasicType() "[" idx=IntLit() "]" { e = new Ast.NewArray(t, idx);}
+           | id=Id() "(" [args=Args()] ")" { e = new Ast.NewObj(id.nm, args);})
+   | e=Expr())
+
+   { return e; }
+}
+
+Ast.Exp Expr():
+{ Ast.Exp e1, e2; }
+{
+   e1=AndExpr() ( "||" e2=AndExpr() {e1 = new Ast.Binop(Ast.BOP.OR, e1, e2);})*
+   { return e1; }
+}
+
+Ast.Exp AndExpr():
+{ Ast.Exp e1, e2; }
+{
+   e1=RelExpr() ( "&&" e2=RelExpr() {e1 = new Ast.Binop(Ast.BOP.AND, e1, e2);})*
+   {return e1; }
+}
+
+Ast.Exp RelExpr():
+{ Ast.Exp e1, e2; Ast.BOP op; }
+{
+   e1=ArithExpr() ( op=RelOp() e2=ArithExpr() {e1 = new Ast.Binop(op, e1, e2);})*
+   {return e1; }
+}
+
+Ast.Exp ArithExpr():
+{ Ast.Exp e1, e2; Ast.BOP op; }
+{
+   e1=Term() ( ("+" {op=Ast.BOP.ADD;}| "-" {op=Ast.BOP.SUB;}) e2=Term() 
+  {e1 = new Ast.Binop(op, e1, e2);})*
+   {return e1; }
+}
+
+Ast.Exp Term():
+{ Ast.Exp e1, e2; Ast.BOP op; }
+{
+   e1=Factor() ( ( "*" {op=Ast.BOP.MUL;} | "/" {op=Ast.BOP.DIV;}) e2=Factor() 
+   {e1 = new Ast.Binop(op, e1, e2);})*
+   {return e1; }
+}
+
+Ast.Exp Factor():
+{
+   Ast.Exp f;
+   Ast.Exp e = null;
+   List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+   boolean hasArgs = false;
+   Ast.UOP unop;
+   String strLit;
+   boolean boolLit;
+   int intLit;
+}
+{
+   ( unop=UnOp() f=Factor() { f = new Ast.Unop(unop, f); }
+   | "(" f=Expr() ")"
+   | f=ExtId() ["(" [args=Args()] ")" {
+     if (f instanceof Ast.Id) {
+        f = new Ast.Call( new Ast.This(), ((Ast.Id)f).nm, args);
+     } else if (f instanceof Ast.Field) {
+        f = new Ast.Call( ((Ast.Field)f).obj, ((Ast.Field)f).nm, args);
+     }} |LOOKAHEAD(2) "["e=Expr()"]" { f = new Ast.ArrayElm(f, e); }]
+   | intLit=IntLit() { f = new Ast.IntLit(intLit); }
+   | boolLit=BoolLit() { f = new Ast.BoolLit(boolLit); })
+   {return f;}
+}
+
+List<Ast.Exp> Args():
+{
+   List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+   Ast.Exp e;
+}
+{
+   e=Expr() {args.add(e);} ("," e=Expr() {args.add(e);})*
+   { return args; }
+}
+
+Ast.Exp ExtId():
+{
+   Ast.Exp extId;
+   Ast.Id id;
+   Ast.Id mn;
+   Ast.This self = null;
+}
+{
+   ["this" "." {self=new Ast.This();}] id=Id() {extId = self == null ? id : new Ast.Field(self, id.nm);}
+   ("." id=Id() {extId = new Ast.Field(extId, id.nm);})*
+   { return extId; }
+}
+
+Ast.Type ExtType():
+{  Ast.Type type; }
+{  
+   ("void" { type=null; } | 
+   type=Type())
+   { return type; }
+}
+
+Ast.Type Type():
+{  Ast.Type type; 
+   Ast.Id typeId; }
+{
+   (type=BasicType() [ "[" "]" { type=new Ast.ArrayType(type); }] |
+   typeId=Id() { type=new Ast.ObjType(typeId.nm); })
+   {return type;}
+}
+
+Ast.Type BasicType():
+{  Ast.Type type; }
+{  "boolean" {return new Ast.BoolType(); } | 
+   "int" { return new Ast.IntType(); }
+}
+
+Ast.Id Id():
+{  Token token; }
+{
+   token=<Id> {
+      String lit = new String(token.image);
+      return new Ast.Id(lit);
+   }
+}
+
+String StrLit():
+{ Token tkn; }
+{
+  tkn=<StrLit> {
+   String lit = new String(tkn.image);
+   return lit.replaceAll("^\"|\"$", "");
+   }
+}
+
+int IntLit():
+{ Token tkn; }
+{
+  tkn=<IntLit> { return Integer.parseInt(tkn.image); }
+}
+
+boolean BoolLit():
+{ Token tkn; }
+{
+  tkn=<BoolLit> { return Boolean.parseBoolean(tkn.image); }
+}
+
+
+Ast.BOP RelOp(): {}
+{
+ ( "==" { return Ast.BOP.EQ; }
+ | "!=" { return Ast.BOP.NE; }
+ | "<"  { return Ast.BOP.LT; }
+ | "<=" { return Ast.BOP.LE; }
+ | ">"  { return Ast.BOP.GT; })
+ | ">=" { return Ast.BOP.GE; }
+}
+
+Ast.UOP UnOp(): {}
+{
+   ( "-" { return Ast.UOP.NEG; }
+   | "!" { return Ast.UOP.NOT; })
+}

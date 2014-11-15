@@ -1,0 +1,585 @@
+//
+// HW3 for Ian Aldrighetti
+//
+// This was based off the grammar given out on D2L.
+//
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+//
+//----------------------------------------------------------------------
+//
+// (For CS321 Fall 2014 - Jingke Li)
+//
+//----------------------------------------------------------------------
+//
+//
+
+// options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(mjParser)
+import java.util.*;
+import java.io.*;
+import ast.*;
+
+public class mjParser
+{
+	public static void main(String [] args)
+	{
+		try
+		{
+			if (args.length == 1)
+			{
+				FileInputStream stream = new FileInputStream(args[0]);
+				Ast.Program p = new mjParser(stream).Program();
+				stream.close();
+				System.out.print(p);
+			}
+			else
+			{
+				System.out.println("Need a file name as command-line argument.");
+			}
+		}
+		catch (TokenMgrError e)
+		{
+			System.err.println(e);
+		}
+		catch (Exception e)
+		{
+			System.err.println(e);
+		}
+	}
+}
+PARSER_END(mjParser)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"
+}
+
+SKIP : /* Comments */
+{
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>			// Single-line
+| <"/*" ( (~["*"])+ | (["*"])+ (~["*","/"]) )* (["*"])* "*/">   // Multi-line
+| <"/*" ( (~["*"])+ | (["*"])+ (~["*","/"]) )* (["*"])*>        // Non-ending
+    { if (true) throw new TokenMgrError("Unterminated block comments ", 0); }
+}
+
+TOKEN : /* Reserved keywords */
+{
+  "class" | "extends" | "static" | "public" | "void" | "int" | "boolean"
+| "new" | "this" | "if" | "else" | "while" | "return" | "main" | "String"
+| "true" | "false" | "System" | "out" | "println"
+}
+
+TOKEN : /* Literals and Ids */
+{
+  <#DIGIT:  ["0"-"9"]>
+| <#LETTER: (["A"-"Z"]|["a"-"z"])>
+| <INTLIT: (<DIGIT>)+> 			/* Integer literals */
+| <STRLIT: ("\"" (~["\"","\n"])* "\"")>	/* String literals */
+| <ID: <LETTER> (<LETTER>|<DIGIT>)*>	/* Identifiers */
+}
+
+TOKEN : /* Operators and delimiters */
+{
+   "+" | "-" | "*" | "/" | "&&" | "||" | "!"
+|  "==" | "!=" | "<" | "<=" | ">" | ">="
+|  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+}
+
+//
+// PARSER SECTION ---------------------------------------------------------------
+//
+
+// Program -> {ClassDecl}
+//
+Ast.Program Program():
+{
+	List<Ast.ClassDecl> cl = new ArrayList<Ast.ClassDecl>();
+	Ast.ClassDecl c;
+}
+{
+  (c = ClassDecl() { cl.add(c); })* <EOF>
+  { return new Ast.Program(cl); }
+}
+
+// ClassDecl -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
+Ast.ClassDecl ClassDecl():
+{
+	Ast.Id className;
+	Ast.Id superClass = null;
+	List<Ast.VarDecl> variables  = new ArrayList<Ast.VarDecl>();
+	List<Ast.MethodDecl> methods = new ArrayList<Ast.MethodDecl>();
+
+	Ast.VarDecl variable;
+	Ast.MethodDecl method;
+}
+{
+	"class" className=ID() ["extends" superClass=ID()]
+	"{"
+		(variable = VarDecl() { variables.add(variable); })*
+		(method = MethodDecl() { methods.add(method); })*
+	"}"
+
+	{
+		return new Ast.ClassDecl(className.nm, superClass == null ? null : superClass.nm, variables, methods);
+	}
+}
+
+// MethodDecl -> "public" (
+//		ExtType ID "(" [Param {"," Param}] ")"
+//	    | "static" "void" "main" "(" "String" "[" "]" ID ")"
+// 	)
+// "{" {VarDecl} {Stmt} "}"
+Ast.MethodDecl MethodDecl():
+{
+	Ast.Type returnType = null;
+	Ast.Id methodName = null;
+	List<Ast.Param> params = new ArrayList<Ast.Param>();
+	List<Ast.VarDecl> varDecls = new ArrayList<Ast.VarDecl>();
+	List<Ast.Stmt> stmts = new ArrayList<Ast.Stmt>();
+
+	Ast.Param param;
+	Ast.VarDecl varDecl;
+	Ast.Stmt stmt;
+}
+{
+	"public"
+	(
+		returnType = ExtType() methodName = ID()
+		"("
+			[param = Param() { params.add(param); }
+			 ("," param=Param() { params.add(param); })*]
+		")"
+
+		|
+		"static" "void" "main" "(" "String" "["  "]" ID() ")"
+	)
+	"{"
+		(LOOKAHEAD(2) varDecl = VarDecl() { varDecls.add(varDecl); })*
+		(stmt = Stmt() { stmts.add(stmt); })*
+	"}"
+	{
+		return new Ast.MethodDecl(returnType, methodName == null? "main" : methodName.nm, params, varDecls, stmts);
+	}
+}
+
+// Param -> Type <ID>
+Ast.Param Param():
+{
+	Ast.Type type;
+	Ast.Id paramName;
+}
+{
+	type = Type() paramName = ID()
+	{
+		return new Ast.Param(type, paramName.nm);
+	}
+}
+
+// VarDecl -> Type <ID> ["=" InitExpr()] ";"
+Ast.VarDecl VarDecl():
+{
+	Ast.Type type;
+	Ast.Id varName;
+	Ast.Exp expr = null;
+}
+{
+	type = Type() varName = ID() ["=" expr = InitExpr()] ";"
+	{
+		return new Ast.VarDecl(type, varName.nm, expr);
+	}
+}
+
+// ExtType -> Type | "void"
+Ast.Type ExtType():
+{
+	Ast.Type type;
+}
+{
+	(
+		"void" { type=null; }
+		| type = Type()
+	)
+	{
+		return type;
+	}
+}
+
+// Type -> <ID> | BasicType ["[" "]"]
+Ast.Type Type():
+{
+	Ast.Type type;
+	Ast.Id typeName;
+}
+{
+	(
+		type = BasicType() [ "[" "]" { type = new Ast.ArrayType(type); }]
+		| typeName = ID() { type = new Ast.ObjType(typeName.nm); }
+	)
+	{
+		return type;
+	}
+}
+
+// BasicType -> "int" | "boolean"
+Ast.Type BasicType():
+{
+	Ast.Type type;
+}
+{
+	"boolean"
+		{
+			return new Ast.BoolType();
+		}
+	| "int"
+		{
+			return new Ast.IntType();
+		}
+}
+
+// Stmt -> "{" {Stmt} "}"
+//         | ExtId ("(" [Args] ")" | ["[" Expr "]"] "=" InitExpr) ";"
+//         | "if" "(" Expr ")" Stmt ["else" Stmt]
+//         | "while" "(" Expr ")" Stmt
+//         | "System" "." "out" "." "println" "(" [PrintArg] ")" ";"
+//         | "return" Expr ";"
+Ast.Stmt Stmt():
+{
+	List<Ast.Stmt> stmts = new ArrayList<Ast.Stmt>();
+	List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+	Ast.Stmt stmt;
+	Ast.Stmt stmt0 = null;
+	Ast.Block block;
+	Ast.Assign assign;
+	Ast.CallStmt call;
+	Ast.If ifStmt;
+	Ast.While whileStmt;
+	Ast.Print print;
+	Ast.Return returnStmt;
+
+	Ast.Exp extId;
+	Ast.Id exp1Id;
+	Ast.Field exp1F;
+	Ast.Exp exp1;
+	Ast.Exp exp2;
+	Ast.Exp exp0 = null;
+	Ast.Node printArg = null;
+}
+{
+	"{"
+		(stmt=Stmt() {stmts.add(stmt);})*
+	"}"
+		{
+			return new Ast.Block(stmts);
+		}
+	| exp1 = ExtId()
+		(
+			["[" exp0 = Expr() "]"] "=" exp2 = InitExpr() ";"
+			{
+
+				if (exp0 == null)
+				{
+					return new Ast.Assign(exp1, exp2);
+				}
+				else
+				{
+					return new Ast.Assign( new Ast.ArrayElm(exp1, exp0), exp2 );
+				}
+			}
+			| "(" [args = Args()] ")" ";"
+			{
+				if (exp1 instanceof Ast.Field)
+				{
+					exp1F = (Ast.Field) exp1;
+					return new Ast.CallStmt(exp1F.obj, exp1F.nm, args);
+				}
+				else
+				{
+					exp1Id = (Ast.Id)exp1;
+					return new Ast.CallStmt(new Ast.This(), exp1Id.nm, args);
+				}
+			}
+		)
+	| "if" "(" exp1 = Expr() ")" stmt = Stmt()  [LOOKAHEAD(1) "else" stmt0 = Stmt()]
+		{
+			return new Ast.If(exp1, stmt, stmt0);
+		}
+	| "while" "(" exp1 = Expr() ")" stmt = Stmt()
+		{
+			return new Ast.While(exp1, stmt);
+		}
+	| "System" "." "out" "." "println" "(" [printArg = PrintArg()] ")" ";"
+		{
+			return new Ast.Print((Ast.PrArg)printArg);
+		}
+	| "return" [exp0 = Expr()] ";"
+		{
+			return new Ast.Return(exp0);
+		}
+}
+
+// Args -> Expr {"," Expr}
+List<Ast.Exp> Args():
+{
+	List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+	Ast.Exp expr;
+}
+{
+	expr = Expr() { args.add(expr); } ("," expr = Expr() { args.add(expr); })*
+	{
+		return args;
+	}
+}
+
+// PrintArg -> Expr | STRLIT
+Ast.Node PrintArg():
+{
+	Ast.Exp expr;
+	String str = null;
+}
+{
+	expr = Expr()
+		{
+			return expr;
+		}
+	| str = StrLit()
+		{
+			return new Ast.StrLit(str);
+		}
+}
+
+// InitExpr -> "new" (BasicType "[" INTLIT "]" | ID "(" ")")
+//             | Expr
+Ast.Exp InitExpr():
+{
+	Ast.Exp expr;
+	Ast.Type type;
+	Ast.Id id;
+	int index;
+}
+{
+	(
+		"new" (type = BasicType() "[" index = IntLit() "]" { expr = new Ast.NewArray(type, index); }
+		| id = ID() "(" ")" { expr = new Ast.NewObj(id.nm); })
+		| expr = Expr()
+	)
+	{
+		return expr;
+	}
+}
+
+// Expr -> AndExpr {"||" AndExpr}
+Ast.Exp Expr():
+{
+	Ast.Exp e1, e2;
+}
+{
+	e1 = AndExpr() ("||" e2 = AndExpr() { e1 = new Ast.Binop(Ast.BOP.OR, e1, e2); })*
+	{
+		return e1;
+	}
+}
+
+// AndExpr -> RelExpr {"&&" RelExpr}
+Ast.Exp AndExpr():
+{
+	Ast.Exp e1, e2;
+}
+{
+	e1 = RelExpr() ("&&" e2=RelExpr() { e1 = new Ast.Binop(Ast.BOP.AND, e1, e2); })*
+	{
+		return e1;
+	}
+}
+
+// RelExpr -> ArithExpr {RelOp ArithExpr}
+Ast.Exp RelExpr():
+{
+	Ast.Exp e1, e2;
+	Ast.BOP op;
+}
+{
+	e1 = ArithExpr() (op = RelOp() e2 = ArithExpr() { e1 = new Ast.Binop(op, e1, e2); })*
+	{
+		return e1;
+	}
+}
+
+// ArithExpr -> Term {("+" | "-") Term}
+Ast.Exp ArithExpr():
+{
+	Ast.Exp e1, e2;
+	Ast.BOP op;
+}
+{
+	e1 = Term()
+	(
+		("+" { op = Ast.BOP.ADD; } | "-" { op = Ast.BOP.SUB; })
+		e2 = Term()
+		{
+			e1 = new Ast.Binop(op, e1, e2);
+		}
+	)*
+	{
+		return e1;
+	}
+}
+
+// Term -> Factor {("*" | "/") Factor}
+Ast.Exp Term():
+{
+	Ast.Exp e1, e2;
+	Ast.BOP op;
+}
+{
+	e1 = Factor()
+	(
+		("*" { op = Ast.BOP.MUL; } | "/" { op = Ast.BOP.DIV;})
+		e2 = Factor()
+		{
+			e1 = new Ast.Binop(op, e1, e2);
+		}
+	)*
+	{
+		return e1;
+	}
+}
+
+// Factor     -> UnOp Factor
+//           |  "(" Expr ")"
+//           |  ExtId ( ["[" Expr "]"]
+//                    | "(" [Args] ")" )
+//           |  Literal
+Ast.Exp Factor():
+{
+	Ast.Exp f;
+	Ast.Exp e = null;
+	List<Ast.Exp> args = new ArrayList<Ast.Exp>();
+	boolean hasArgs = false;
+	Ast.UOP unop;
+	String strLit;
+	boolean boolLit;
+	int intLit;
+}
+{
+	(
+		unop = UnOp() f = Factor() { f = new Ast.Unop(unop, f); }
+		| "(" f = Expr() ")"
+		| f = ExtId()
+		[
+			"(" [args = Args()] ")"
+			{
+				if (f instanceof Ast.Id)
+				{
+					f = new Ast.Call( new Ast.This(), ((Ast.Id)f).nm, args);
+				}
+				else if (f instanceof Ast.Field)
+				{
+					f = new Ast.Call(((Ast.Field)f).obj, ((Ast.Field)f).nm, args);
+				}
+			}
+			| LOOKAHEAD(2) "[" e = Expr() "]" { f = new Ast.ArrayElm(f, e); }
+		]
+		| intLit = IntLit() { f = new Ast.IntLit(intLit); }
+		| boolLit = BoolLit() { f = new Ast.BoolLit(boolLit); }
+	)
+	{
+		return f;
+	}
+}
+
+// ExtId -> ["this" "."] <ID> {"." <ID>}
+Ast.Exp ExtId():
+{
+	Ast.Exp extId;
+	Ast.Id id;
+	Ast.Id mn;
+	Ast.This self = null;
+}
+{
+	["this" "." { self = new Ast.This(); }]
+	id = ID()
+		{
+			extId = self == null ? id : new Ast.Field(self, id.nm);
+		}
+	("." id = ID() { extId = new Ast.Field(extId, id.nm); })*
+	{
+		return extId;
+	}
+}
+
+// ID -> <ID>
+Ast.Id ID():
+{
+	Token token;
+}
+{
+	token = <ID>
+	{
+		String lit = new String(token.image);
+		return new Ast.Id(lit);
+	}
+}
+
+// StrLit -> <STRLIT>
+String StrLit():
+{
+	Token tkn;
+}
+{
+	tkn = <STRLIT>
+	{
+		String lit = new String(tkn.image);
+		return lit.replaceAll("^\"|\"$", "");
+	}
+}
+
+// IntLit -> <INTLIT>
+int IntLit():
+{
+	Token tkn;
+}
+{
+	tkn = <INTLIT>
+	{
+		return Integer.parseInt(tkn.image);
+	}
+}
+
+// BoolLit -> "true" | "false"
+boolean BoolLit():
+{
+	String bool;
+}
+{
+	("true" { bool = "true"; } | "false" { bool = "false"; })
+	{
+		return Boolean.parseBoolean(bool);
+	}
+}
+
+// CompOp -> "==" | "!=" | "<" | "<=" | ">" | ">="
+Ast.BOP RelOp(): {}
+{
+	(
+		"==" { return Ast.BOP.EQ; }
+		| "!=" { return Ast.BOP.NE; }
+		| "<"  { return Ast.BOP.LT; }
+		| "<=" { return Ast.BOP.LE; }
+		| ">"  { return Ast.BOP.GT; }
+	) | ">=" { return Ast.BOP.GE; }
+}
+
+// UnOp -> ("-" | "!")
+Ast.UOP UnOp(): {}
+{
+   (
+	   "-" { return Ast.UOP.NEG; }
+	   | "!" { return Ast.UOP.NOT; }
+   )
+}

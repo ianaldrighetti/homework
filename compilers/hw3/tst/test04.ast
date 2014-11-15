@@ -1,0 +1,9 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ArrayType IntType) a ()
+   Assign a (NewArray IntType 2)
+   Assign (ArrayElm a 0) 1
+   Assign (ArrayElm a 1) 2
+   Print (ArrayElm a 0)
+   Print (ArrayElm a 1)

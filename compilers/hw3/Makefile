@@ -4,7 +4,8 @@
 
 JFLAGS = -g
 JC = javac
-JCC = javacc
+JCC = ../javacc-5.0/bin/javacc
+#JCC = javacc
 
 .SUFFIXES: .jj .java .class
 
