@@ -1,0 +1,7 @@
+# AST Program
+ClassDecl A 
+  VarDecl IntType i ()
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ObjType A) x (NewObj A)
+   VarDecl IntType y (Field x j) 

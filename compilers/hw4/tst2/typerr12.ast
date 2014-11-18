@@ -1,0 +1,8 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ArrayType IntType) x (NewArray IntType 1)
+   Print "result"
+   Print true
+   Print 2
+   Print x

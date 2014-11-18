@@ -1,0 +1,11 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl IntType m ()
+   If true
+    If true
+     Return 2
+    Else
+     Return 3
+   Else
+    Return 4
+  MethodDecl void main ()

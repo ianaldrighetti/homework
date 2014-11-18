@@ -1,0 +1,13 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ObjType A) a (NewObj A)
+   Print (Call a go ())
+ClassDecl A 
+  MethodDecl IntType go ()
+   VarDecl (ArrayType IntType) b ()
+   Assign b (NewArray IntType 2)
+   Assign (ArrayElm b 0) 3
+   Assign (ArrayElm b 1) 4
+   Print (ArrayElm b 1)
+   Return (ArrayElm b 0)

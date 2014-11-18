@@ -1,0 +1,43 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ObjType A) a (NewObj A)
+   VarDecl (ArrayType IntType) numbers (NewArray IntType 10)
+   VarDecl IntType cnt 0
+   While (Binop < cnt 10)
+    {
+     Assign (ArrayElm numbers cnt) (Binop - 10 cnt)
+     Assign cnt (Binop + cnt 1)
+    }
+   CallStmt a selectionSort (numbers cnt )
+   Print "Your numbers in sorted order are:"
+   Assign cnt 0
+   While (Binop < cnt 10)
+    {
+     Print (ArrayElm numbers cnt)
+     Assign cnt (Binop + cnt 1)
+    }
+ClassDecl A 
+  MethodDecl void selectionSort ((Param (ArrayType IntType) A) (Param IntType count) )
+   VarDecl IntType temp ()
+   VarDecl IntType i (Binop - count 1)
+   VarDecl IntType j ()
+   VarDecl IntType k ()
+   While (Binop >= i 0)
+    {
+     Assign j 0
+     Assign k 0
+     While (Binop <= j i)
+      {
+       If (Binop > (ArrayElm A j) (ArrayElm A k))
+        Assign k j
+       Assign j (Binop + j 1)
+      }
+     If (Binop != k i)
+      {
+       Assign temp (ArrayElm A k)
+       Assign (ArrayElm A k) (ArrayElm A i)
+       Assign (ArrayElm A i) temp
+      }
+     Assign i (Binop - i 1)
+    }

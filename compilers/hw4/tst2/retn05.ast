@@ -1,0 +1,7 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl IntType m ()
+   VarDecl IntType i 1
+   While (Binop == i 1)
+    Return 1
+  MethodDecl void main ()

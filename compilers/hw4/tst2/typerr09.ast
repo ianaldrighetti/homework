@@ -1,0 +1,6 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl IntType x 0
+   VarDecl IntType i ()
+   Assign i (ArrayElm x 5)

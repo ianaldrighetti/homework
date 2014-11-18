@@ -1,0 +1,1 @@
+Checker$TypeException: (In Print) Arg type is not int, boolean, or string: (ArrayType IntType)

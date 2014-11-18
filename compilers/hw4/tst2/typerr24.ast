@@ -1,0 +1,9 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl IntType f ()
+   Return 1
+  MethodDecl void test ()
+   VarDecl IntType x ()
+   Assign x (Call This f ())
+   Assign x (Call This f (1 ))
+  MethodDecl void main ()

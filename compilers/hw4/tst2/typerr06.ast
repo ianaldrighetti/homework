@@ -1,0 +1,7 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl BoolType b true
+   VarDecl BoolType c false
+   Assign b (Binop && c true)
+   Assign b (Binop && 1 true)

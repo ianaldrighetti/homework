@@ -1,0 +1,1 @@
+Checker$TypeException: (In Assign) lhs and rhs types don't match: (ObjType B) <- (ObjType A)

@@ -1,0 +1,7 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl IntType f ((Param IntType i) )
+   Return 1
+  MethodDecl void main ()
+   VarDecl (ArrayType IntType) x (NewArray IntType 2)
+   VarDecl IntType y (Field x i) 

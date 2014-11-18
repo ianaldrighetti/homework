@@ -1,0 +1,6 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl BoolType m ()
+   Return true
+   Return 4
+  MethodDecl void main ()

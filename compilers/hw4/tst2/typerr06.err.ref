@@ -1,0 +1,1 @@
+Checker$TypeException: (In Binop) Operand types don't match: IntType && BoolType

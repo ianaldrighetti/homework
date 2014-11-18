@@ -1,0 +1,14 @@
+# AST Program
+ClassDecl A 
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl (ObjType A) u (NewObj A)
+   VarDecl (ObjType A) v (NewObj A)
+   VarDecl (ArrayType IntType) x (NewArray IntType 5)
+   VarDecl (ArrayType IntType) y (NewArray IntType 4)
+   VarDecl (ArrayType IntType) z x
+   Print (Binop == u v)
+   Print (Binop == x y)
+   Print (Binop == a x)
+   Print (Binop < u v)
+   Print (Binop < x z)

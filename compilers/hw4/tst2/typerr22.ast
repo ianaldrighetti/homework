@@ -1,0 +1,17 @@
+# AST Program
+ClassDecl A 
+ClassDecl B A
+ClassDecl C B
+ClassDecl D A
+ClassDecl Test 
+  MethodDecl void test ()
+   VarDecl (ObjType A) a (NewObj A)
+   VarDecl (ObjType B) b (NewObj B)
+   VarDecl (ObjType C) c (NewObj C)
+   VarDecl (ObjType D) d (NewObj D)
+   Assign a b
+   Assign a c
+   Assign b c
+   Assign b a
+   Assign b d
+  MethodDecl void main ()

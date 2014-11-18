@@ -1,0 +1,16 @@
+# AST Program
+ClassDecl A 
+ClassDecl B A
+ClassDecl C B
+ClassDecl Test 
+  MethodDecl void foo ((Param (ObjType A) x) )
+  MethodDecl void bar ((Param (ObjType B) x) )
+  MethodDecl void test ()
+   VarDecl (ObjType A) a (NewObj A)
+   VarDecl (ObjType B) b (NewObj B)
+   VarDecl (ObjType C) c (NewObj C)
+   CallStmt This foo (b )
+   CallStmt This foo (c )
+   CallStmt This bar (c )
+   CallStmt This bar (a )
+  MethodDecl void main ()

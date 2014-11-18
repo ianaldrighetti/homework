@@ -1,0 +1,5 @@
+# AST Program
+ClassDecl Test 
+  MethodDecl void main ()
+   VarDecl IntType x ()
+   Assign x true
