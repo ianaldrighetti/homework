@@ -190,7 +190,23 @@ public class Checker {
   //
   static void check(Ast.ClassDecl n) throws Exception {
 
-    // ... need code ...
+	// Construct the ClassInfo instance.
+	ClassInfo classInfo = new ClassInfo(n, classEnv.get(n.pnm));
+	thisCInfo = classInfo;
+
+    // Reset the type environment.
+    typeEnv = new HashMap<String, Ast.Type>();
+
+    // TODO probably need to invoke check on each property, in both, down the chain.
+    for (VarDecl varDecl : n.flds)
+    {
+    	check(varDecl);
+    }
+
+    for (MethodDecl methodDecl : n.mthds)
+    {
+    	check(methodDecl);
+    }
 
   }
 
@@ -207,8 +223,24 @@ public class Checker {
   //
   static void check(Ast.MethodDecl n) throws Exception {
 
-    // ... need code ...
+    thisMDecl = n;
+    typeEnv = new HashMap<String, Ast.Type>();
 
+    for (Param p : n.params)
+    {
+    	check(p);
+    }
+
+    for (VarDecl v : n.vars)
+    {
+    	check(v);
+    	typeEnv.put(v.nm, v.t);
+    }
+
+    for (Stmt s : n.stmts)
+    {
+    	check(s);
+    }
   }
 
   // Param ---
@@ -219,8 +251,15 @@ public class Checker {
   //
   static void check(Ast.Param n) throws Exception {
 
-    // ... need code ...
+   if (!(n.t instanceof Ast.ObjType))
+   {
+   	return;
+   }
 
+   if (!classEnv.containsKey(n.t.nm))
+   {
+   	throw new TypeException(n.nm + " attempted to use " + n.t.nm + " class which does not exist.");
+   }
   }
 
   // VarDecl ---
@@ -398,14 +437,23 @@ public class Checker {
   //  int len;
   //
   //  1. Verify that n.et is either integer or boolean.
-  //  2. Varify that n.len is non-negative.
+  //  2. Verify that n.len is non-negative.
   //  (Note: While the AST representation allows these cases to happen, our
   //  miniJava parser does not, so these checks are not very meaningful.)
   //
   static Ast.Type check(Ast.NewArray n) throws Exception {
 
-    // ... need code ...
+    if (!(n.et instanceof Ast.IntLit) && !(n.et instanceof Ast.BoolLit))
+    {
+    	throw new TypeException("Must be integer or bool.");
+    }
 
+    if (n.len < 0)
+    {
+    	throw new TypeException("Length must be non-negative.");
+    }
+
+    return n.et;
   }
 
   // ArrayElm ---
@@ -415,8 +463,18 @@ public class Checker {
   //
   static Ast.Type check(Ast.ArrayElm n) throws Exception {
 
-    // ... need code ...
+	// TODO verify this...
+    if (!(n.ar instanceof Ast.ArrayType))
+    {
+    	throw new TypeException("not an array");
+    }
 
+    if (!(n.idx instanceof Ast.IntLit))
+    {
+    	throw new TypeException("expecting an integer");
+    }
+
+	return n.ar;
   }
 
   // NewObj ---
@@ -426,21 +484,45 @@ public class Checker {
   //
   static Ast.Type check(Ast.NewObj n) throws Exception {
 
-    // ... need code ...
+    if (!classEnv.containsKey(n.nm))
+    {
+    	throw new TypeException (n.nm + " is not a defined class.");
+    }
 
+    Ast.ObjType objType = classEnv.get(n.nm);
+
+    return objType;
   }
 
   // Field ---
   //  Exp obj;
   //  String nm;
   //
-  //  1. Verify that n.onj is ObjType, and its corresponding class exists.
+  //  1. Verify that n.obj is ObjType, and its corresponding class exists.
   //  2. Verify that n.nm is a valid field in the object.
   //
   static Ast.Type check(Ast.Field n) throws Exception {
 
-    // ... need code ...
+	// TODO: n.nm is the name of the variable... not the type.
+    if (!(n.obj instanceof Ast.ObjType))
+    {
+    	throw new TypeException(n.nm + " is not an ObjType");
+    }
 
+    Ast.ObjType objType = (Ast.ObjType)n.obj;
+    if (!classEnv.containsKey(objType.nm))
+    {
+    	throw new TypeException(objType.nm + " is not a defined class, for variable " + n.nm);
+    }
+
+    Ast.VarDecl fieldDecl = classEnv.get(n.nm);
+
+	if (fieldDecl == null)
+	{
+		throw new TypeException(n.nm + " is not defined on the class.");
+	}
+
+	return objType;
   }
 
   // Id ---
@@ -453,8 +535,19 @@ public class Checker {
   //
   static Ast.Type check(Ast.Id n) throws Exception {
 
-    // ... need code ...
+    // First check if it exists within typeEnv.
+    if (typeEnv.containsKey(n.nm)) {
+    	return typeEnv.get(n.nm);
+    }
 
+    // It might be an attribute (field) on the class.
+    Ast.VarDecl fieldDecl = thisCInfo.findFieldDecl(n.nm);
+
+	if (fieldDecl == null) {
+		throw new TypeException(n.nm + " variable not found.");
+	}
+
+	return fieldDecl.t;
   }
 
   // This ---
@@ -464,8 +557,16 @@ public class Checker {
   //
   static Ast.Type check(Ast.This n) {
 
-    // ... need code ...
+    // This shouldn't be null.
+    if (thisCInfo == null)
+    {
+    	throw new TypeException("Referencing this when none exists.");
+    }
 
+    // Otherwise we're going to return an ObjType instance with the name of the class.
+    Ast.ObjType objType = new Ast.ObjType(thisCInfo.className());
+
+    return objType;
   }
 
   // Literals
