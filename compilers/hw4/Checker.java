@@ -272,8 +272,20 @@ public class Checker {
   //
   static void check(Ast.VarDecl n) throws Exception {
 
-    // ... need code ...
+	if (n.t instanceof Ast.ObjType && !classEnv.containsKey(((Ast.ObjType) n.t).nm)
+	{
+		throw new TypeException(n.nm + " is defined as a class " + ((Ast.ObjType) n.t).nm + " which is not defined.");
+	}
 
+	if (n.init == null)
+	{
+		return;
+	}
+
+	if (!assignable(n.t, (Ast.Type)n.init))
+	{
+		throw new TypeException("Not assignable");
+	}
   }
 
   // STATEMENTS
@@ -297,8 +309,15 @@ public class Checker {
   //
   static void check(Ast.Block n) throws Exception {
 
-    // ... need code ...
+	if (n.stmts.length == 0)
+	{
+		return;
+	}
 
+    for (Stmt s : n.stmts)
+    {
+    	check(s);
+    }
   }
 
   // Assign ---
