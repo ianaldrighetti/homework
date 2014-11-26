@@ -318,9 +318,11 @@ public class Checker
     static void check(Ast.VarDecl n) throws Exception
     {
 
-        if (n.t instanceof Ast.ObjType && !classEnv.containsKey(((Ast.ObjType) n.t).nm) {
-        throw new TypeException(n.nm + " is defined as a class " + ((Ast.ObjType) n.t).nm + " which is not defined.");
-    }
+        if (n.t instanceof Ast.ObjType && !classEnv.containsKey(((Ast.ObjType) n.t).nm))
+        {
+            throw new TypeException(n.nm + " is defined as a class " + ((Ast.ObjType) n.t).nm + " which is not " +
+                    "defined.");
+        }
 
         if (n.init == null)
         {
