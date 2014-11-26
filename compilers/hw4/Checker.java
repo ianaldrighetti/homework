@@ -9,6 +9,7 @@
 // (For CS321 Fall 2014 - Jingke Li)
 //
 
+import java.lang.IllegalArgumentException;
 import java.util.*;
 import java.io.*;
 
@@ -131,9 +132,17 @@ public class Checker
         {
             return true;
         }
+        else if (tdst instanceof Ast.ArrayType && tsrc instanceof Ast.ArrayType)
+        {
+            return assignable(((Ast.ArrayType)tdst).et, ((Ast.ArrayType)tsrc).et);
+        }
+        else if (tdst instanceof Ast.ObjType && tsrc instanceof Ast.ObjType)
+        {
+            ClassInfo pClassInfo = classEnv.get(((Ast.ObjType)tsrc).nm);
+            return hasAncestor(pClassInfo, ((Ast.ObjType)tdst).nm);
+        }
 
-        // ... need code ...
-
+        return false;
     }
 
     // Returns true if t1 and t2 can be compared with "==" or "!=".
@@ -141,6 +150,147 @@ public class Checker
     private static boolean comparable(Ast.Type t1, Ast.Type t2) throws Exception
     {
         return assignable(t1, t2) || assignable(t2, t1);
+    }
+
+    /**
+     * Determines whether the parent is the same class as childName, or if any parent of the parent matches.
+     *
+     * @param parent
+     * @param childName
+     * @return
+     */
+    private static boolean hasAncestor(ClassInfo parent, String childName)
+    {
+        if (parent.className().equals(childName))
+        {
+            return true;
+        }
+
+        if (parent.parent == null)
+        {
+            return false;
+        }
+
+        return hasAncestor(parent.parent, childName);
+    }
+
+    /**
+     * Returns the type of the expression.
+     * @param exp
+     * @return
+     */
+    private static Ast.Type getExprType(Ast.Exp exp) throws TypeException
+    {
+        // Exp: Binop, Unop, Call, NewArray, ArrayElm, NewObj, Field, Id, This, IntLit, BoolLit
+        // Types: IntType, BoolType, ArrayType, ObjType.
+
+        if (exp instanceof Ast.Binop)
+        {
+            return Ast.BoolType;
+        }
+        else if (exp instanceof Ast.Unop)
+        {
+            Ast.Unop unOp = (Ast.Unop)exp;
+            return unOp.op == Ast.UOP.NOT ? Ast.BoolType : Ast.IntType;
+        }
+        else if (exp instanceof Ast.Call)
+        {
+            Ast.Call call = (Ast.Call)exp;
+
+            ClassInfo callObj = classEnv.get(getClassNameFromExp(call.obj));
+
+            if (callObj == null) {
+                throw new TypeException("Class " + getClassNameFromExp(call.obj) + " does not exist.");
+            }
+
+            Ast.MethodDecl method = callObj.findMethodDecl(call.nm);
+
+            if (method == null) {
+                throw new TypeException("Method " + call.nm + " does not exist on class " + getClassNameFromExp(call.obj));
+            }
+
+            return method.t;
+        }
+        else if (exp instanceof Ast.NewArray)
+        {
+            return ((Ast.NewArray)exp).et;
+        }
+        else if (exp instanceof Ast.ArrayElm)
+        {
+            Ast.ArrayElm arrElm = (Ast.ArrayElm)exp;
+            String arrName = ((Ast.Id)arrElm.ar).nm;
+
+            Ast.Type arrType = typeEnv.get(arrName);
+
+            if (arrType == null) {
+                throw new TypeException("Array " + arrName + " not defined.");
+            }
+
+            return ((Ast.ArrayType)arrType).et;
+        }
+        else if (exp instanceof Ast.NewObj)
+        {
+            Ast.NewObj newObj = (Ast.NewObj)exp;
+
+            return new Ast.ObjType(newObj.nm);
+        }
+        else if (exp instanceof Ast.Field)
+        {
+            Ast.Field field = (Ast.Field)exp;
+            String className = getClassNameFromExp(field.obj);
+
+            ClassInfo classInfo = classEnv.get(className);
+
+            if (classInfo == null) {
+                throw new TypeException(className + " not defined class.");
+            }
+
+            Ast.VarDecl varDecl = classInfo.findFieldDecl(field.nm);
+
+            if (varDecl == null) {
+                throw new TypeException(field.nm + " not defined on " + className);
+            }
+
+            return varDecl.t;
+        }
+        else if (exp instanceof Ast.Id)
+        {
+            Ast.Id id = (Ast.Id)exp;
+
+            Ast.Type type = typeEnv.get(id.nm);
+
+            if (type == null) {
+                throw new TypeException(id.nm + " not defined");
+            }
+
+            return type;
+        }
+        else if (exp instanceof Ast.This)
+        {
+            return new Ast.ObjType(thisCInfo.className());
+        }
+        else if (exp instanceof Ast.IntLit)
+        {
+            return Ast.IntType;
+        }
+        else if (exp instanceof Ast.BoolLit)
+        {
+            return Ast.BoolType;
+        }
+        else
+        {
+            throw new IllegalArgumentException("Unknown expression: " + exp.getClass().getName());
+        }
+    }
+
+    private static String getClassNameFromExp(Ast.Exp callObj)
+    {
+        if (callObj instanceof Ast.NewObj)
+        {
+            return ((Ast.NewObj)callObj).nm;
+        }
+
+        throw new IllegalArgumentException("Cannot handle getClassNameFromExp for type: " + callObj.getClass().getName());
     }
 
     //------------------------------------------------------------------------------
@@ -241,12 +391,12 @@ public class Checker
         typeEnv = new HashMap<String, Ast.Type>();
 
         // TODO probably need to invoke check on each property, in both, down the chain.
-        for (VarDecl varDecl : n.flds)
+        for (Ast.VarDecl varDecl : n.flds)
         {
             check(varDecl);
         }
 
-        for (MethodDecl methodDecl : n.mthds)
+        for (Ast.MethodDecl methodDecl : n.mthds)
         {
             check(methodDecl);
         }
@@ -270,18 +420,18 @@ public class Checker
         thisMDecl = n;
         typeEnv = new HashMap<String, Ast.Type>();
 
-        for (Param p : n.params)
+        for (Ast.Param p : n.params)
         {
             check(p);
         }
 
-        for (VarDecl v : n.vars)
+        for (Ast.VarDecl v : n.vars)
         {
             check(v);
             typeEnv.put(v.nm, v.t);
         }
 
-        for (Stmt s : n.stmts)
+        for (Ast.Stmt s : n.stmts)
         {
             check(s);
         }
@@ -301,9 +451,10 @@ public class Checker
             return;
         }
 
-        if (!classEnv.containsKey(n.t.nm))
+        Ast.ObjType objType = (Ast.ObjType)n.t;
+        if (!classEnv.containsKey(objType.nm))
         {
-            throw new TypeException(n.nm + " attempted to use " + n.t.nm + " class which does not exist.");
+            throw new TypeException(n.nm + " attempted to use " + objType.nm + " class which does not exist.");
         }
     }
 
@@ -329,7 +480,8 @@ public class Checker
             return;
         }
 
-        if (!assignable(n.t, (Ast.Type) n.init))
+        Ast.Type expType = getExprType(n.init);
+        if (!assignable(n.t, expType))
         {
             throw new TypeException("Not assignable");
         }
@@ -379,7 +531,7 @@ public class Checker
             return;
         }
 
-        for (Stmt s : n.stmts)
+        for (Ast.Stmt s : n.stmts)
         {
             check(s);
         }
@@ -571,7 +723,7 @@ public class Checker
     static Ast.Type check(Ast.NewArray n) throws Exception
     {
 
-        if (!(n.et instanceof Ast.IntLit) && !(n.et instanceof Ast.BoolLit))
+        if (!(n.et instanceof Ast.IntType) && !(n.et instanceof Ast.BoolType))
         {
             throw new TypeException("Must be integer or bool.");
         }
@@ -593,7 +745,7 @@ public class Checker
     {
 
         // TODO verify this...
-        if (!(n.ar instanceof Ast.ArrayType))
+        if (!(getExprType(n.ar) instanceof Ast.ArrayType))
         {
             throw new TypeException("not an array");
         }
@@ -603,7 +755,7 @@ public class Checker
             throw new TypeException("expecting an integer");
         }
 
-        return n.ar;
+        return getExprType(n.ar);
     }
 
     // NewObj ---
@@ -619,9 +771,7 @@ public class Checker
             throw new TypeException(n.nm + " is not a defined class.");
         }
 
-        Ast.ObjType objType = classEnv.get(n.nm);
-
-        return objType;
+        return new Ast.ObjType(n.nm);
     }
 
     // Field ---
@@ -635,18 +785,18 @@ public class Checker
     {
 
         // TODO: n.nm is the name of the variable... not the type.
-        if (!(n.obj instanceof Ast.ObjType))
+        if (!(getExprType(n.obj) instanceof Ast.ObjType))
         {
             throw new TypeException(n.nm + " is not an ObjType");
         }
 
-        Ast.ObjType objType = (Ast.ObjType) n.obj;
+        Ast.ObjType objType = (Ast.ObjType)getExprType(n.obj);
         if (!classEnv.containsKey(objType.nm))
         {
             throw new TypeException(objType.nm + " is not a defined class, for variable " + n.nm);
         }
 
-        Ast.VarDecl fieldDecl = classEnv.get(n.nm);
+        Ast.VarDecl fieldDecl = classEnv.get(objType.nm).findFieldDecl(n.nm);
 
         if (fieldDecl == null)
         {
@@ -689,7 +839,7 @@ public class Checker
     //  Find and return an ObjType that corresponds to the current class
     //  (through the current ClassInfo).
     //
-    static Ast.Type check(Ast.This n)
+    static Ast.Type check(Ast.This n) throws Exception
     {
 
         // This shouldn't be null.
