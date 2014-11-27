@@ -562,9 +562,44 @@ public class Checker
     //
     static void check(Ast.CallStmt n) throws Exception
     {
+        Ast.Type astType = getExprType(n.obj);
 
-        // ... need code ...
+        if (!(astType instanceof Ast.ObjType))
+        {
+            throw new TypeException("CallStmt requires obj be an Object.");
+        }
 
+        Ast.ObjType objType = (Ast.ObjType)astType;
+
+        ClassInfo classInfo = classEnv.get(objType.nm);
+
+        if (classInfo == null)
+        {
+            throw new TypeException("The class " + objType.nm + " does not exist.");
+        }
+
+        Ast.MethodDecl method = classInfo.findMethodDecl(n.nm);
+
+        if (method == null)
+        {
+            throw new TypeException("Method " + n.nm + " does not exist on " + objType.nm);
+        }
+
+        if (n.args.length != method.params.length)
+        {
+            throw new TypeException("Not enough parameters passed.");
+        }
+
+        for (int index = 0; index < n.args.length; index++)
+        {
+            Ast.Param pDef = method.params[index];
+            Ast.Type argType = getExprType(n.args[index]);
+
+            if (!pDef.t.getClass().getName().equals(argType.getClass().getName()))
+            {
+                throw new TypeException("Param " + pDef.nm + " was passed a mismatched type.");
+            }
+        }
     }
 
     // If ---
@@ -678,9 +713,86 @@ public class Checker
     //
     static Ast.Type check(Ast.Binop n) throws Exception
     {
+        Ast.Type e1Type = getExprType(n.e1);
+        Ast.Type e2Type = getExprType(n.e2);
 
-        // ... need code ...
+        //ADD("+"), SUB("-"), MUL("*"), DIV("/"), AND("&&"), OR("||"),
+        //EQ("=="), NE("!="), LT("<"), LE("<="), GT(">"), GE(">=");
 
+        // Arithmetic.
+        if (n.op == Ast.BOP.ADD || n.op == Ast.BOP.SUB || n.op == Ast.BOP.MUL || n.op == Ast.BOP.DIV)
+        {
+            // Both must be integer.
+            if (e1Type instanceof Ast.IntType && e2Type instanceof Ast.IntType)
+            {
+                return Ast.IntType;
+            }
+
+            throw new TypeException("Must be integers to use arithmetic.");
+        }
+
+        // Logical.
+        if (n.op == Ast.BOP.AND || n.op == Ast.BOP.OR)
+        {
+            if (e1Type instanceof Ast.BoolType && e2Type instanceof Ast.BoolType)
+            {
+                return Ast.BoolType;
+            }
+
+            throw new TypeException("Must be BOOL to use logical.");
+        }
+
+        // Equals and not equals can work on integers, bools, arrays or objects of same type.
+        if (n.op == Ast.BOP.EQ || n.op == Ast.BOP.NE)
+        {
+            if (e1Type instanceof Ast.IntType && e2Type instanceof Ast.IntType)
+            {
+                return Ast.IntType;
+            }
+            else if (e1Type instanceof Ast.BoolType && e2Type instanceof Ast.BoolType)
+            {
+                return Ast.BoolType;
+            }
+            else if (e1Type instanceof Ast.ArrayType && e2Type instanceof Ast.ArrayType)
+            {
+                Ast.ArrayType a1 = (Ast.ArrayType)e1Type;
+                Ast.ArrayType a2 = (Ast.ArrayType)e2Type;
+
+                if (a1.et.getClass().getName().equals(a2.getClass().getName()))
+                {
+                    return a1;
+                }
+
+                throw new TypeException("Array element type must match.");
+            }
+            else if (e1Type instanceof Ast.ObjType && e2Type instanceof Ast.ObjType)
+            {
+                Ast.ObjType a1 = (Ast.ObjType)e1Type;
+                Ast.ObjType a2 = (Ast.ObjType)e2Type;
+
+                if (a1.nm.equals(a2.nm))
+                {
+                    return a1;
+                }
+
+                throw new TypeException("Object name must match.");
+            }
+
+            throw new TypeException("== and != require operands of same type.");
+        }
+
+        //LT("<"), LE("<="), GT(">"), GE(">=")
+        if (n.op == Ast.BOP.LT || n.op == Ast.BOP.LE || n.op == Ast.BOP.GT || n.op == Ast.BOP.GE)
+        {
+            if (e1Type instanceof Ast.IntType && e2Type instanceof Ast.IntType)
+            {
+                return Ast.IntType;
+            }
+
+            throw new TypeException("Must use integers with LT, LE, GT and GE.");
+        }
+
+        throw new TypeException("Unhandled case of operator.");
     }
 
     // Unop ---
@@ -691,9 +803,24 @@ public class Checker
     //
     static Ast.Type check(Ast.Unop n) throws Exception
     {
+        Ast.Type eType = getExprType(n.e);
 
-        // ... need code ...
+        if (n.op == Ast.UOP.NEG)
+        {
+            if (eType instanceof Ast.IntType)
+            {
+                return eType;
+            }
 
+            throw new TypeException("- operator must be used with integer.");
+        }
+
+        if (eType instanceof Ast.BoolType)
+        {
+            return eType;
+        }
+
+        throw new TypeException("! operator must be used with bool.");
     }
 
     // Call ---
@@ -707,8 +834,46 @@ public class Checker
     static Ast.Type check(Ast.Call n) throws Exception
     {
 
-        // ... need code ...
+        Ast.Type astType = getExprType(n.obj);
 
+        if (!(astType instanceof Ast.ObjType))
+        {
+            throw new TypeException("Call requires obj be an Object.");
+        }
+
+        Ast.ObjType objType = (Ast.ObjType)astType;
+
+        ClassInfo classInfo = classEnv.get(objType.nm);
+
+        if (classInfo == null)
+        {
+            throw new TypeException("The class " + objType.nm + " does not exist.");
+        }
+
+        Ast.MethodDecl method = classInfo.findMethodDecl(n.nm);
+
+        if (method == null)
+        {
+            throw new TypeException("Method " + n.nm + " does not exist on " + objType.nm);
+        }
+
+        if (n.args.length != method.params.length)
+        {
+            throw new TypeException("Not enough parameters passed.");
+        }
+
+        for (int index = 0; index < n.args.length; index++)
+        {
+            Ast.Param pDef = method.params[index];
+            Ast.Type argType = getExprType(n.args[index]);
+
+            if (!pDef.t.getClass().getName().equals(argType.getClass().getName()))
+            {
+                throw new TypeException("Param " + pDef.nm + " was passed a mismatched type.");
+            }
+        }
+
+        return method.t;
     }
 
     // NewArray ---
