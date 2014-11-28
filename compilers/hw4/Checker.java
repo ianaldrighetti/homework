@@ -177,7 +177,7 @@ public class Checker
      * @return The type.
      * @throws Exception
      */
-    private static Ast.Type getIdDef(String varName) throws Exception
+    private static Ast.Type getVarDef(String varName) throws Exception
     {
         // First check local variable definitions.
         if (typeEnv.containsKey(varName))
@@ -222,7 +222,8 @@ public class Checker
             Ast.Type e1Type = getExprType(binop.e1);
             Ast.Type e2Type = getExprType(binop.e2);
 
-            if (e1Type instanceof Ast.IntType && e2Type instanceof Ast.IntType)
+            if (e1Type instanceof Ast.IntType && e2Type instanceof Ast.IntType && (binop.op == Ast.BOP.ADD
+                || binop.op == Ast.BOP.DIV || binop.op == Ast.BOP.MUL || binop.op == Ast.BOP.SUB))
             {
                 return Ast.IntType;
             }
@@ -254,14 +255,15 @@ public class Checker
         }
         else if (exp instanceof Ast.NewArray)
         {
-            return ((Ast.NewArray)exp).et;
+            Ast.NewArray arr = (Ast.NewArray) exp;
+            return new Ast.ArrayType(arr.et);
         }
         else if (exp instanceof Ast.ArrayElm)
         {
             Ast.ArrayElm arrElm = (Ast.ArrayElm)exp;
             String arrName = ((Ast.Id)arrElm.ar).nm;
 
-            Ast.Type arrType = typeEnv.get(arrName);
+            Ast.Type arrType = getVarDef(arrName);
 
             if (arrType == null) {
                 throw new TypeException("Array " + arrName + " not defined.");
@@ -280,6 +282,19 @@ public class Checker
             Ast.Field field = (Ast.Field)exp;
             String className = getClassNameFromExp(field.obj);
 
+            Ast.Exp objExp = field.obj;
+            while(objExp instanceof Ast.Field)
+            {
+                Ast.Type nestedType = getExprType(objExp);
+
+                if (nestedType instanceof Ast.ObjType)
+                {
+                    className = ((Ast.ObjType)nestedType).nm;
+                }
+
+                objExp = ((Ast.Field)objExp).obj;
+            }
+
             ClassInfo classInfo = classEnv.get(className);
 
             if (classInfo == null) {
@@ -288,7 +303,8 @@ public class Checker
 
             Ast.VarDecl varDecl = classInfo.findFieldDecl(field.nm);
 
-            if (varDecl == null) {
+            if (varDecl == null)
+            {
                 throw new TypeException(field.nm + " not defined on " + className);
             }
 
@@ -298,7 +314,7 @@ public class Checker
         {
             Ast.Id id = (Ast.Id)exp;
 
-            Ast.Type type = getIdDef(id.nm);
+            Ast.Type type = getVarDef(id.nm);
 
             if (type == null) {
                 throw new TypeException("(In Id) Can't find variable " + id.nm);
@@ -356,6 +372,20 @@ public class Checker
         else if (callObj instanceof Ast.This)
         {
             return thisCInfo.className();
+        }
+        else if (callObj instanceof Ast.Field)
+        {
+            Ast.Field field = (Ast.Field) callObj;
+            String className = getClassNameFromExp(field.obj);
+
+            ClassInfo obj = classEnv.get(className);
+
+            if (obj == null)
+            {
+                throw new TypeException("The class " + className + " is not defined.");
+            }
+
+            return className;
         }
 
         throw new IllegalArgumentException("Cannot handle getClassNameFromExp for type: " + callObj.getClass().getName());
@@ -714,7 +744,8 @@ public class Checker
     {
         if (n.arg == null)
         {
-            throw new TypeException("PrArg must not be null.");
+            // This is okay too (test01).
+            return;
         }
 
         if (n.arg instanceof Ast.StrLit)
