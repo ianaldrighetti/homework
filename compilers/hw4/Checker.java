@@ -155,9 +155,9 @@ public class Checker
     /**
      * Determines whether the parent is the same class as childName, or if any parent of the parent matches.
      *
-     * @param parent
-     * @param childName
-     * @return
+     * @param parent The parent ClassInfo.
+     * @param childName Name of the child class.
+     * @return Whether childName is a direct match or an ancestor of parent.
      */
     private static boolean hasAncestor(ClassInfo parent, String childName)
     {
@@ -166,26 +166,67 @@ public class Checker
             return true;
         }
 
-        if (parent.parent == null)
-        {
-            return false;
-        }
+        return parent.parent != null && hasAncestor(parent.parent, childName);
 
-        return hasAncestor(parent.parent, childName);
     }
 
     /**
-     * Returns the type of the expression.
-     * @param exp
-     * @return
+     * Finds a variable declaration.
+     *
+     * @param varName
+     * @return The type.
+     * @throws Exception
      */
-    private static Ast.Type getExprType(Ast.Exp exp) throws TypeException
+    private static Ast.Type getIdDef(String varName) throws Exception
+    {
+        // First check local variable definitions.
+        if (typeEnv.containsKey(varName))
+        {
+            return typeEnv.get(varName);
+        }
+
+        // Now check for parameters.
+        for (Ast.Param param : thisMDecl.params)
+        {
+            if (param.nm.equals(varName))
+            {
+                return param.t;
+            }
+        }
+
+        // Finally, fields on the class itself.
+        Ast.VarDecl field = thisCInfo.findFieldDecl(varName);
+
+        if (field != null)
+        {
+            return field.t;
+        }
+
+        throw new TypeException("Variable " + varName + " not defined.");
+    }
+
+    /**
+     * Returns the type of the expression. This resolves an Identifier to it's defined type.
+     *
+     * @param exp The expression.
+     * @return The Expression type.
+     */
+    private static Ast.Type getExprType(Ast.Exp exp) throws Exception
     {
         // Exp: Binop, Unop, Call, NewArray, ArrayElm, NewObj, Field, Id, This, IntLit, BoolLit
         // Types: IntType, BoolType, ArrayType, ObjType.
 
         if (exp instanceof Ast.Binop)
         {
+            Ast.Binop binop = (Ast.Binop) exp;
+            Ast.Type e1Type = getExprType(binop.e1);
+            Ast.Type e2Type = getExprType(binop.e2);
+
+            if (e1Type instanceof Ast.IntType && e2Type instanceof Ast.IntType)
+            {
+                return Ast.IntType;
+            }
+
             return Ast.BoolType;
         }
         else if (exp instanceof Ast.Unop)
@@ -257,10 +298,10 @@ public class Checker
         {
             Ast.Id id = (Ast.Id)exp;
 
-            Ast.Type type = typeEnv.get(id.nm);
+            Ast.Type type = getIdDef(id.nm);
 
             if (type == null) {
-                throw new TypeException(id.nm + " not defined");
+                throw new TypeException("(In Id) Can't find variable " + id.nm);
             }
 
             return type;
@@ -283,11 +324,38 @@ public class Checker
         }
     }
 
-    private static String getClassNameFromExp(Ast.Exp callObj)
+    /**
+     * Returns the name of the class from an expression.
+     *
+     * @param callObj The expression.
+     * @return Class name.
+     * @throws Exception
+     */
+    private static String getClassNameFromExp(Ast.Exp callObj) throws Exception
     {
         if (callObj instanceof Ast.NewObj)
         {
             return ((Ast.NewObj)callObj).nm;
+        }
+        else if (callObj instanceof Ast.Id)
+        {
+            Ast.Id var = (Ast.Id) callObj;
+            Ast.Type varDef = typeEnv.get(var.nm);
+
+            if (varDef == null)
+            {
+                throw new TypeException("Variable " + var.nm + " not defined.");
+            }
+            else if (!(varDef instanceof Ast.ObjType))
+            {
+                throw new TypeException("Variable " + var.nm + " is not an object.");
+            }
+
+            return ((Ast.ObjType) varDef).nm;
+        }
+        else if (callObj instanceof Ast.This)
+        {
+            return thisCInfo.className();
         }
 
         throw new IllegalArgumentException("Cannot handle getClassNameFromExp for type: " + callObj.getClass().getName());
@@ -368,7 +436,7 @@ public class Checker
                 }
             }
         }
-        return cl.toArray(new Ast.ClassDecl[0]);
+        return cl.toArray(new Ast.ClassDecl[cl.size()]);
     }
 
     // ClassDecl ---
@@ -384,8 +452,7 @@ public class Checker
     {
 
         // Construct the ClassInfo instance.
-        ClassInfo classInfo = new ClassInfo(n, classEnv.get(n.pnm));
-        thisCInfo = classInfo;
+        thisCInfo = new ClassInfo(n, classEnv.get(n.pnm));
 
         // Reset the type environment.
         typeEnv = new HashMap<String, Ast.Type>();
@@ -545,9 +612,13 @@ public class Checker
     //
     static void check(Ast.Assign n) throws Exception
     {
+        Ast.Type lhsType = getExprType(n.lhs);
+        Ast.Type rhsType = getExprType(n.rhs);
 
-        // ... need code ...
-
+        if (!assignable(lhsType, rhsType))
+        {
+            throw new TypeException("rhs not assignable to lhs");
+        }
     }
 
     // CallStmt ---
@@ -610,9 +681,12 @@ public class Checker
     //
     static void check(Ast.If n) throws Exception
     {
+        Ast.Type condType = getExprType(n.cond);
 
-        // ... need code ...
-
+        if (!(condType instanceof Ast.BoolType))
+        {
+            throw new TypeException("condition must be boolean.");
+        }
     }
 
     // While ---
@@ -623,9 +697,12 @@ public class Checker
     //
     static void check(Ast.While n) throws Exception
     {
+        Ast.Type condType = getExprType(n.cond);
 
-        // ... need code ...
-
+        if (!(condType instanceof Ast.BoolType))
+        {
+            throw new TypeException("condition must be boolean.");
+        }
     }
 
     // Print ---
@@ -635,9 +712,24 @@ public class Checker
     //
     static void check(Ast.Print n) throws Exception
     {
+        if (n.arg == null)
+        {
+            throw new TypeException("PrArg must not be null.");
+        }
 
-        // ... need code ...
+        if (n.arg instanceof Ast.StrLit)
+        {
+            return;
+        }
 
+        Ast.Type prArgType = getExprType((Ast.Exp) n.arg);
+
+        if (prArgType instanceof Ast.IntType || prArgType instanceof Ast.BoolType)
+        {
+            return;
+        }
+
+        throw new TypeException("PrArg must be string, integer or boolean.");
     }
 
     // Return ---
@@ -647,9 +739,32 @@ public class Checker
     //
     static void check(Ast.Return n) throws Exception
     {
+        if (thisMDecl.t == null)
+        {
+            if (n.val == null)
+            {
+                return;
+            }
 
-        // ... need code ...
+            throw new TypeException("Method has no return type, but a return was specified.");
+        }
 
+        // Now the return type is not null, but nothing was returned.
+        if (n.val == null)
+        {
+            throw new TypeException("Method expects return.");
+        }
+
+        Ast.Type returnType = getExprType(n.val);
+
+        if (thisMDecl.t.getClass().getName().equals(returnType.getClass().getName()))
+        {
+            return;
+        }
+        System.out.println("\"" + n.val + "\"");
+System.out.println(returnType);
+        throw new TypeException("(In class " + thisCInfo.className() + " in method " + thisMDecl.nm + ") " +
+                "Return type does not match.");
     }
 
     // EXPRESSIONS
