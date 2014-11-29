@@ -99,6 +99,10 @@ public class Checker
     // thisCInfo - points to the current class's ClassInfo
     // thisMDecl - points to the current method's MethodDecl
     //
+    // returnStmtCount - The number of return statements, in total, within the current method.
+    // analyzeReturn - Whether the return's should be analyzed to be missing or not.
+    // hasRootReturn - Whether the very root of the method has a return statement or not.
+    //
     // For other analyses:
     // (Define as you need.)
     //
@@ -106,7 +110,9 @@ public class Checker
     private static HashMap<String, Ast.Type> typeEnv = new HashMap<String, Ast.Type>();
     private static ClassInfo thisCInfo = null;
     private static Ast.MethodDecl thisMDecl = null;
-    private static int returnStmtCount = 0;
+    private static int completeIfPaths = 0;
+    private static boolean analyzeReturn = false;
+    private static boolean hasRootReturn = false;
 
     //------------------------------------------------------------------------------
     // Type Compatibility Routines
@@ -548,9 +554,12 @@ public class Checker
     //
     static void check(Ast.MethodDecl n) throws Exception
     {
+        // Set everything to what it should be to begin with.
         thisMDecl = n;
         typeEnv = new HashMap<String, Ast.Type>();
-        returnStmtCount = 0;
+        completeIfPaths = 0;
+        analyzeReturn = n.t != null;
+        hasRootReturn = false;
 
         for (Ast.Param p : n.params)
         {
@@ -563,16 +572,97 @@ public class Checker
             typeEnv.put(v.nm, v.t);
         }
 
+        // We must go through the statements once before checking to see if there is a root return statement.
         for (Ast.Stmt s : n.stmts)
         {
+            if (!(s instanceof Ast.Return))
+            {
+                continue;
+            }
+
+            hasRootReturn = true;
+            break;
+        }
+
+        for (Ast.Stmt s : n.stmts)
+        {
+            if (!analyzeStmtReturn(s))
+            {
+                throw new TypeException("(In MethodDecl) Missing return statement");
+            }
+
             check(s);
         }
 
         // If this method requires a return (has a return type) and none of the statements were return, then
         // there is definitely a missing return statement.
-        if (n.t != null && returnStmtCount == 0)
+        if (analyzeReturn && !hasRootReturn && completeIfPaths == 0)
         {
             throw new TypeException("(In MethodDecl) Missing return statement");
+        }
+    }
+
+    /**
+     * Analyzes whether all paths have return statements.
+     * @param s The statement to analyze.
+     * @return Whether a path is missing a return statement.
+     */
+    private static boolean analyzeStmtReturn(Ast.Stmt s)
+    {
+        if (!analyzeReturn || hasRootReturn || !(s instanceof Ast.If /*|| s instanceof Ast.While*/ || s instanceof Ast.Block
+            || s instanceof Ast.Return))
+        {
+            return true;
+        }
+
+        // If it's a Return statement, we return true. As this is the only statement and there is definitely a path
+        // for a return to occur.
+        if (s instanceof Ast.Return)
+        {
+            return true;
+        }
+        // Now if it is a block, we need to see if the root has a return, if it does, then we can return true. If
+        // there are If's or While statements we will recursively call this method.
+        else if (s instanceof Ast.Block)
+        {
+            Ast.Block block = (Ast.Block) s;
+
+            for (Ast.Stmt bs : block.stmts)
+            {
+                if (bs instanceof Ast.Return)
+                {
+                    return true;
+                }
+            }
+
+            for (Ast.Stmt bs : block.stmts)
+            {
+                if (!(bs instanceof Ast.If))
+                {
+                    continue;
+                }
+
+                // We only need one If statement to always return a statement. If one does, we're good.
+                if (analyzeStmtReturn(bs))
+                {
+                    return true;
+                }
+            }
+
+            // Otherwise a path with a return is missing.
+            return false;
+        }
+        // Now to analyze the If itself.
+        else
+        {
+            Ast.If ifStmt = (Ast.If) s;
+
+            boolean ifHasReturn = analyzeStmtReturn(ifStmt.s1);
+            boolean elseHasReturn = ifStmt.s2 != null && analyzeStmtReturn(ifStmt.s2);
+
+            completeIfPaths += ifHasReturn && elseHasReturn ? 1 : 0;
+
+            return ifHasReturn && elseHasReturn;
         }
     }
 
@@ -835,8 +925,6 @@ public class Checker
     //
     static void check(Ast.Return n) throws Exception
     {
-        returnStmtCount++;
-
         if (thisMDecl.t == null)
         {
             if (n.val == null)
@@ -989,6 +1077,11 @@ public class Checker
                 }
 
                 throw new TypeException("Object name must match.");
+            }
+            else if (!comparable(e1Type, e2Type))
+            {
+                throw new TypeException("(In Binop) Operand types don't match: " + getTypeName(e1Type) +
+                        " " + n.op + " " + getTypeName(e2Type));
             }
 
             throw new TypeException("(In Binop) Operand types don't match: " + getTypeName(e1Type) +
