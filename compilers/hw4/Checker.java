@@ -106,6 +106,7 @@ public class Checker
     private static HashMap<String, Ast.Type> typeEnv = new HashMap<String, Ast.Type>();
     private static ClassInfo thisCInfo = null;
     private static Ast.MethodDecl thisMDecl = null;
+    private static int returnStmtCount = 0;
 
     //------------------------------------------------------------------------------
     // Type Compatibility Routines
@@ -171,6 +172,34 @@ public class Checker
     }
 
     /**
+     * Returns the name of the type. Example, if the type is Ast.IntType, IntType is returned. However, ArrayType and
+     * ObjType will return: (ArrayType {Element Type}) for arrays and (ObjType {Class Name}) for objects.
+     *
+     * @param type The type instance.
+     * @return The type name.
+     */
+    private static String getTypeName(Ast.Type type)
+    {
+        if (type instanceof Ast.ObjType)
+        {
+            return "(ObjType " + ((Ast.ObjType)type).nm + ")";
+        }
+        else if (type instanceof Ast.ArrayType)
+        {
+            return "(ArrayType " + getTypeName(((Ast.ArrayType)type).et) + ")";
+        }
+
+        String actualType = type.getClass().getCanonicalName();
+
+        if (actualType.contains("."))
+        {
+            actualType = actualType.substring(actualType.lastIndexOf('.') + 1);
+        }
+
+        return actualType;
+    }
+
+    /**
      * Finds a variable declaration.
      *
      * @param varName
@@ -202,7 +231,7 @@ public class Checker
             return field.t;
         }
 
-        throw new TypeException("Variable " + varName + " not defined.");
+        throw new TypeException("(In Id) Can't find variable " + varName);
     }
 
     /**
@@ -247,8 +276,9 @@ public class Checker
 
             Ast.MethodDecl method = callObj.findMethodDecl(call.nm);
 
-            if (method == null) {
-                throw new TypeException("Method " + call.nm + " does not exist on class " + getClassNameFromExp(call.obj));
+            if (method == null)
+            {
+                throw new TypeException("(In CallStmt) Can't find method " + call.nm);
             }
 
             return method.t;
@@ -265,8 +295,13 @@ public class Checker
 
             Ast.Type arrType = getVarDef(arrName);
 
-            if (arrType == null) {
+            if (arrType == null)
+            {
                 throw new TypeException("Array " + arrName + " not defined.");
+            }
+            else if (!(arrType instanceof Ast.ArrayType))
+            {
+                throw new TypeException("(In ArrayElm) Object is not array: " + getTypeName(arrType));
             }
 
             return ((Ast.ArrayType)arrType).et;
@@ -305,7 +340,7 @@ public class Checker
 
             if (varDecl == null)
             {
-                throw new TypeException(field.nm + " not defined on " + className);
+                throw new TypeException("(In Field) Can't find field " + field.nm);
             }
 
             return varDecl.t;
@@ -364,7 +399,7 @@ public class Checker
             }
             else if (!(varDef instanceof Ast.ObjType))
             {
-                throw new TypeException("Variable " + var.nm + " is not an object.");
+                throw new TypeException("(In Field) Object is not of ObjType: " + getTypeName(varDef));
             }
 
             return ((Ast.ObjType) varDef).nm;
@@ -513,9 +548,9 @@ public class Checker
     //
     static void check(Ast.MethodDecl n) throws Exception
     {
-
         thisMDecl = n;
         typeEnv = new HashMap<String, Ast.Type>();
+        returnStmtCount = 0;
 
         for (Ast.Param p : n.params)
         {
@@ -531,6 +566,13 @@ public class Checker
         for (Ast.Stmt s : n.stmts)
         {
             check(s);
+        }
+
+        // If this method requires a return (has a return type) and none of the statements were return, then
+        // there is definitely a missing return statement.
+        if (n.t != null && returnStmtCount == 0)
+        {
+            throw new TypeException("(In MethodDecl) Missing return statement");
         }
     }
 
@@ -551,7 +593,7 @@ public class Checker
         Ast.ObjType objType = (Ast.ObjType)n.t;
         if (!classEnv.containsKey(objType.nm))
         {
-            throw new TypeException(n.nm + " attempted to use " + objType.nm + " class which does not exist.");
+            throw new TypeException("(In Param) Can't find class " + objType.nm);
         }
     }
 
@@ -568,8 +610,7 @@ public class Checker
 
         if (n.t instanceof Ast.ObjType && !classEnv.containsKey(((Ast.ObjType) n.t).nm))
         {
-            throw new TypeException(n.nm + " is defined as a class " + ((Ast.ObjType) n.t).nm + " which is not " +
-                    "defined.");
+            throw new TypeException("(In VarDecl) Can't find class " + ((Ast.ObjType) n.t).nm);
         }
 
         if (n.init == null)
@@ -577,10 +618,14 @@ public class Checker
             return;
         }
 
+        // Run the check on the initialization... just in case.
+        check(n.init);
+
         Ast.Type expType = getExprType(n.init);
         if (!assignable(n.t, expType))
         {
-            throw new TypeException("Not assignable");
+            throw new TypeException("(In VarDecl) Cannot assign variable " + getTypeName(n.t) +
+                    " <- " + getTypeName(expType));
         }
     }
 
@@ -645,9 +690,13 @@ public class Checker
         Ast.Type lhsType = getExprType(n.lhs);
         Ast.Type rhsType = getExprType(n.rhs);
 
+        // Run a check on the right-hand side.
+        check(n.rhs);
+
         if (!assignable(lhsType, rhsType))
         {
-            throw new TypeException("rhs not assignable to lhs");
+            throw new TypeException("(In Assign) lhs and rhs types don't match: " + getTypeName(lhsType) +
+                    " <- " + getTypeName(rhsType));
         }
     }
 
@@ -683,7 +732,7 @@ public class Checker
 
         if (method == null)
         {
-            throw new TypeException("Method " + n.nm + " does not exist on " + objType.nm);
+            throw new TypeException("(In CallStmt) Can't find method " + n.nm);
         }
 
         if (n.args.length != method.params.length)
@@ -696,9 +745,10 @@ public class Checker
             Ast.Param pDef = method.params[index];
             Ast.Type argType = getExprType(n.args[index]);
 
-            if (!pDef.t.getClass().getName().equals(argType.getClass().getName()))
+            if (!getTypeName(pDef.t).equals(getTypeName(argType)))
             {
-                throw new TypeException("Param " + pDef.nm + " was passed a mismatched type.");
+                throw new TypeException("(In CallStmt) Param and arg types don't match: " + getTypeName(argType) +
+                        " vs. " + getTypeName(pDef.t));
             }
         }
     }
@@ -715,7 +765,17 @@ public class Checker
 
         if (!(condType instanceof Ast.BoolType))
         {
-            throw new TypeException("condition must be boolean.");
+            throw new TypeException("(In If) Cond exp type is not boolean: " + getTypeName(condType));
+        }
+
+        if (n.s1 != null)
+        {
+            check(n.s1);
+        }
+
+        if (n.s2 != null)
+        {
+            check(n.s2);
         }
     }
 
@@ -732,6 +792,11 @@ public class Checker
         if (!(condType instanceof Ast.BoolType))
         {
             throw new TypeException("condition must be boolean.");
+        }
+
+        if (n.s != null)
+        {
+            check(n.s);
         }
     }
 
@@ -760,7 +825,7 @@ public class Checker
             return;
         }
 
-        throw new TypeException("PrArg must be string, integer or boolean.");
+        throw new TypeException("(In Print) Arg type is not int, boolean, or string: " + getTypeName(prArgType));
     }
 
     // Return ---
@@ -770,6 +835,8 @@ public class Checker
     //
     static void check(Ast.Return n) throws Exception
     {
+        returnStmtCount++;
+
         if (thisMDecl.t == null)
         {
             if (n.val == null)
@@ -777,13 +844,13 @@ public class Checker
                 return;
             }
 
-            throw new TypeException("Method has no return type, but a return was specified.");
+            throw new TypeException("(In Return) Unexpected return value");
         }
 
         // Now the return type is not null, but nothing was returned.
         if (n.val == null)
         {
-            throw new TypeException("Method expects return.");
+            throw new TypeException("(In Return) Missing return value of type " + getTypeName(thisMDecl.t));
         }
 
         Ast.Type returnType = getExprType(n.val);
@@ -792,10 +859,9 @@ public class Checker
         {
             return;
         }
-        System.out.println("\"" + n.val + "\"");
-System.out.println(returnType);
-        throw new TypeException("(In class " + thisCInfo.className() + " in method " + thisMDecl.nm + ") " +
-                "Return type does not match.");
+
+        throw new TypeException("(In Return) Return type mismatch: " + getTypeName(thisMDecl.t) +
+                " <- " + getTypeName(returnType));
     }
 
     // EXPRESSIONS
@@ -885,7 +951,8 @@ System.out.println(returnType);
                 return Ast.BoolType;
             }
 
-            throw new TypeException("Must be BOOL to use logical.");
+            throw new TypeException("(In Binop) Operand types don't match: " + getTypeName(e1Type) +
+                    " " + n.op + " " + getTypeName(e2Type));
         }
 
         // Equals and not equals can work on integers, bools, arrays or objects of same type.
@@ -924,7 +991,8 @@ System.out.println(returnType);
                 throw new TypeException("Object name must match.");
             }
 
-            throw new TypeException("== and != require operands of same type.");
+            throw new TypeException("(In Binop) Operand types don't match: " + getTypeName(e1Type) +
+                    " " + n.op + " " + getTypeName(e2Type));
         }
 
         //LT("<"), LE("<="), GT(">"), GE(">=")
@@ -958,7 +1026,7 @@ System.out.println(returnType);
                 return eType;
             }
 
-            throw new TypeException("- operator must be used with integer.");
+            throw new TypeException("(In Unop) Bad operand type: - " + getTypeName(eType));
         }
 
         if (eType instanceof Ast.BoolType)
@@ -966,7 +1034,7 @@ System.out.println(returnType);
             return eType;
         }
 
-        throw new TypeException("! operator must be used with bool.");
+        throw new TypeException("(In Unop) Bad operand type: ! " + getTypeName(eType));
     }
 
     // Call ---
@@ -1005,7 +1073,8 @@ System.out.println(returnType);
 
         if (n.args.length != method.params.length)
         {
-            throw new TypeException("Not enough parameters passed.");
+            throw new TypeException("(In Call) Param and arg counts don't match: " + method.params.length +
+                    " vs. " + n.args.length);
         }
 
         for (int index = 0; index < n.args.length; index++)
@@ -1015,7 +1084,8 @@ System.out.println(returnType);
 
             if (!pDef.t.getClass().getName().equals(argType.getClass().getName()))
             {
-                throw new TypeException("Param " + pDef.nm + " was passed a mismatched type.");
+                throw new TypeException("(In Call) Param and arg types don't match: " + getTypeName(pDef.t) +
+                        " vs. " + getTypeName(argType));
             }
         }
 
@@ -1050,20 +1120,18 @@ System.out.println(returnType);
     // ArrayElm ---
     //  Exp ar, idx;
     //
-    //  Varify that n.ar is array and n.idx is integer.
+    //  Verify that n.ar is array and n.idx is integer.
     //
     static Ast.Type check(Ast.ArrayElm n) throws Exception
     {
-
-        // TODO verify this...
         if (!(getExprType(n.ar) instanceof Ast.ArrayType))
         {
             throw new TypeException("not an array");
         }
 
-        if (!(n.idx instanceof Ast.IntLit))
+        if (!(n.idx instanceof Ast.IntLit) && !(getExprType(n.idx) instanceof Ast.IntType))
         {
-            throw new TypeException("expecting an integer");
+            throw new TypeException("(In ArrayElm) Index is not integer: " + getTypeName(getExprType(n.idx)));
         }
 
         return getExprType(n.ar);
@@ -1076,10 +1144,9 @@ System.out.println(returnType);
     //
     static Ast.Type check(Ast.NewObj n) throws Exception
     {
-
         if (!classEnv.containsKey(n.nm))
         {
-            throw new TypeException(n.nm + " is not a defined class.");
+            throw new TypeException("(In NewObj) Can't find class " + n.nm);
         }
 
         return new Ast.ObjType(n.nm);
@@ -1094,11 +1161,9 @@ System.out.println(returnType);
     //
     static Ast.Type check(Ast.Field n) throws Exception
     {
-
-        // TODO: n.nm is the name of the variable... not the type.
         if (!(getExprType(n.obj) instanceof Ast.ObjType))
         {
-            throw new TypeException(n.nm + " is not an ObjType");
+            throw new TypeException("(In Field) Object is not of ObjType: " + getTypeName(getExprType(n.obj)));
         }
 
         Ast.ObjType objType = (Ast.ObjType)getExprType(n.obj);
@@ -1111,7 +1176,7 @@ System.out.println(returnType);
 
         if (fieldDecl == null)
         {
-            throw new TypeException(n.nm + " is not defined on the class.");
+            throw new TypeException("(In Field) Can't find field " + n.nm);
         }
 
         return objType;
