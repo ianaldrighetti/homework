@@ -108,6 +108,7 @@ public class Checker
     //
     private static HashMap<String, ClassInfo> classEnv = new HashMap<String, ClassInfo>();
     private static HashMap<String, Ast.Type> typeEnv = new HashMap<String, Ast.Type>();
+    private static HashMap<String, Boolean> varInit = new HashMap<String, Boolean>();
     private static ClassInfo thisCInfo = null;
     private static Ast.MethodDecl thisMDecl = null;
     private static int completeIfPaths = 0;
@@ -168,12 +169,7 @@ public class Checker
      */
     private static boolean hasAncestor(ClassInfo parent, String childName)
     {
-        if (parent.className().equals(childName))
-        {
-            return true;
-        }
-
-        return parent.parent != null && hasAncestor(parent.parent, childName);
+        return parent.className().equals(childName) || (parent.parent != null && hasAncestor(parent.parent, childName));
 
     }
 
@@ -208,7 +204,7 @@ public class Checker
     /**
      * Finds a variable declaration.
      *
-     * @param varName
+     * @param varName The variable name.
      * @return The type.
      * @throws Exception
      */
@@ -528,7 +524,6 @@ public class Checker
         // Reset the type environment.
         typeEnv = new HashMap<String, Ast.Type>();
 
-        // TODO probably need to invoke check on each property, in both, down the chain.
         for (Ast.VarDecl varDecl : n.flds)
         {
             check(varDecl);
@@ -591,6 +586,11 @@ public class Checker
                 throw new TypeException("(In MethodDecl) Missing return statement");
             }
 
+            if (s instanceof Ast.Assign)
+            {
+                processAssignment((Ast.Assign) s);
+            }
+
             check(s);
         }
 
@@ -599,6 +599,57 @@ public class Checker
         if (analyzeReturn && !hasRootReturn && completeIfPaths == 0)
         {
             throw new TypeException("(In MethodDecl) Missing return statement");
+        }
+    }
+
+    /**
+     * Processes the assignment of a value to a variable.
+     *
+     * @param s The assignment to process.
+     */
+    private static void processAssignment(Ast.Assign s) throws Exception
+    {
+        String varName = null;
+        if (s.lhs instanceof Ast.Id)
+        {
+            varName = ((Ast.Id) s.lhs).nm;
+        }
+        else if (s.lhs instanceof Ast.Field)
+        {
+            varName = getFieldName((Ast.Field) s.lhs);
+        }
+
+        if (varName == null)
+        {
+            return;
+        }
+
+        varInit.put(varName, true);
+    }
+
+    private static String getFieldName(Ast.Field field) throws Exception
+    {
+        if (field.obj instanceof Ast.Field)
+        {
+            return getFieldName((Ast.Field) field.obj) + "." + field.nm;
+        }
+        else if (field.obj instanceof Ast.NewObj)
+        {
+            return ((Ast.NewObj) field.obj).nm + "." + field.nm;
+        }
+        else if (field.obj instanceof Ast.Id)
+        {
+            Ast.ObjType objType = (Ast.ObjType)getVarDef(((Ast.Id) field.obj).nm);
+
+            return objType + "." + field.nm;
+        }
+        else if (field.obj instanceof Ast.This)
+        {
+            return thisCInfo.className() + "." + field.nm;
+        }
+        else
+        {
+            throw new TypeException("Unhandled getFieldName for exp " + field.obj.getClass().getCanonicalName());
         }
     }
 
@@ -697,7 +748,6 @@ public class Checker
     //
     static void check(Ast.VarDecl n) throws Exception
     {
-
         if (n.t instanceof Ast.ObjType && !classEnv.containsKey(((Ast.ObjType) n.t).nm))
         {
             throw new TypeException("(In VarDecl) Can't find class " + ((Ast.ObjType) n.t).nm);
@@ -716,6 +766,17 @@ public class Checker
         {
             throw new TypeException("(In VarDecl) Cannot assign variable " + getTypeName(n.t) +
                     " <- " + getTypeName(expType));
+        }
+
+        if (n.t instanceof Ast.ObjType)
+        {
+            String classQualifier = ((Ast.ObjType)n.t).nm + ".";
+
+            varInit.put(classQualifier + n.nm, true);
+        }
+        else
+        {
+            varInit.put(n.nm, true);
         }
     }
 
