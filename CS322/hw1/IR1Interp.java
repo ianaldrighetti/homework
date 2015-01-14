@@ -6,6 +6,20 @@ import java.util.*;
 import java.io.*;
 
 import ir1.*;
+import ir1.IR1.AOP;
+import ir1.IR1.BoolLit;
+import ir1.IR1.Dest;
+import ir1.IR1.Inst;
+import ir1.IR1.IntLit;
+import ir1.IR1.Jump;
+import ir1.IR1.Label;
+import ir1.IR1.LabelDec;
+import ir1.IR1.ROP;
+import ir1.IR1.Return;
+import ir1.IR1.Src;
+import ir1.IR1.StrLit;
+import ir1.IR1.Temp;
+import ir1.IR1.UOP;
 
 public class IR1Interp
 {
@@ -13,7 +27,7 @@ public class IR1Interp
 	static class IntException extends Exception
 	{
 		private static final long serialVersionUID = 1L;
-
+		
 		public IntException(String msg)
 		{
 			super(msg);
@@ -105,7 +119,58 @@ public class IR1Interp
 	// For IR1, they need to be managed at per function level.
 	//
 	
-	// ... code needed ...
+	/**
+	 * Represents an Environment.
+	 *
+	 * @author Ian
+	 */
+	static class Environment
+	{
+		private Map<String, Integer> labelMap;
+		private Map<Integer, Val> tempMap;
+		private Map<String, Val> varMap;
+		
+		public Environment()
+		{
+			labelMap = new HashMap<String, Integer>();
+			tempMap = new HashMap<Integer, IR1Interp.Val>();
+			varMap = new HashMap<String, IR1Interp.Val>();
+		}
+		
+		public Integer getLabelLocation(String label)
+		{
+				return labelMap.get(label);
+		}
+		
+		public void setLabelLocation(String label, Integer location)
+		{
+			labelMap.put(label, location);
+		}
+		
+		public Val getTempVal(Integer identifier)
+		{
+				return tempMap.get(identifier);
+		}
+		
+		public void setTempVal(Integer identifier, Val value)
+		{
+			tempMap.put(identifier, value);
+		}
+		
+		public Val getVarVal(String variable)
+		{
+				return varMap.get(variable);
+		}
+		
+		public void setVarVal(String variable, Val value)
+		{
+			varMap.put(variable, value);
+		}
+	}
+	
+	// The current environment.
+	static Environment env;
+
 	
 	// -----------------------------------------------------------------
 	// Global variables and constants
@@ -122,14 +187,16 @@ public class IR1Interp
 	
 	// Heap memory
 	// - for handling 'malloc'ed data
-	// - you need to define alloc and access methods for it
+	// - you need to define allocation and access methods for it
 	//
 	static ArrayList<Val> heap;
 	
 	// Return value
 	// - for passing return value from callee to caller
 	//
-	static Val retVal;
+	static Val returnVal;
+	
+	static Stack<Environment> callStack = new Stack<Environment>();
 	
 	// Execution status
 	// - tells whether to continue with the nest inst, to jump to
@@ -178,10 +245,14 @@ public class IR1Interp
 	public static void execute(IR1.Program n) throws Exception
 	{
 		funcMap = new HashMap<String, IR1.Func>();
-		storage = new ArrayList<Val>();
-		retVal = Val.Undefined;
+		heap = new ArrayList<Val>();
+		returnVal = new UndVal();
+		
 		for (IR1.Func f : n.funcs)
+		{
 			funcMap.put(f.name, f);
+		}
+		
 		execute(funcMap.get("main"));
 	}
 	
@@ -197,20 +268,56 @@ public class IR1Interp
 	//
 	static void execute(IR1.Func n) throws Exception
 	{
+		// Push the current environment onto the stack, if any.
+		if (env != null)
+		{
+			callStack.push(env);
+		}
 		
-		// ... code needed ...
+		// Regardless, make a new environment.
+		env = new Environment();
+		
+		for (int offset = 0; offset < n.code.length; offset++)
+		{
+			Inst instr = n.code[offset];
+			
+			if (!(instr instanceof LabelDec))
+			{
+				continue;
+			}
+			
+			LabelDec labelDecl = (LabelDec) instr;
+			env.setLabelLocation(labelDecl.name, offset);
+		}
 		
 		// The fetch-and-execute loop
 		int idx = 0;
 		while (idx < n.code.length)
 		{
 			int next = execute(n.code[idx]);
+			
 			if (next == CONTINUE)
+			{
 				idx++;
+			}
 			else if (next == RETURN)
+			{
 				break;
+			}
 			else
+			{
 				idx = next;
+			}
+		}
+		
+		if (callStack.isEmpty())
+		{
+			env = null;
+		}
+		else
+		{
+			// Restore the environment.
+			env = callStack.pop();
 		}
 	}
 	
@@ -256,8 +363,23 @@ public class IR1Interp
 	//
 	static int execute(IR1.Binop n) throws Exception
 	{
+		Val res;
 		
-		// ... code needed ...
+		if (n.op instanceof AOP)
+		{
+			res = evaluate((AOP) n.op, n.src1, n.src2);
+		}
+		else if (n.op instanceof ROP)
+		{
+			boolean result = evaluate((ROP) n.op, n.src1, n.src2);
+			res = new BoolVal(result);
+		}
+		else
+		{
+			throw new IntException("Unhandled operator: " + n.op.getClass().getName() + ".");
+		}
+		
+		assign(n.dst, res);
 		
 		return CONTINUE;
 	}
@@ -269,17 +391,24 @@ public class IR1Interp
 	//
 	static int execute(IR1.Unop n) throws Exception
 	{
-		Val val = execute(n.src);
+		Val val = evaluate(n.src);
 		Val res;
-		if (n.op == IR1.UOP.NEG)
-			res = new IntVal(-((IntVal) val).i);
-		else if (n.op == IR0.UOP.NOT)
-			res = new BoolVal(!((BoolVal) val).b);
-		else
-			throw new IntException("Wrong op in Unop inst: " + n.op);
 		
-		// ... code needed ...
-
+		if (n.op == IR1.UOP.NEG)
+		{
+			res = new IntVal(-((IntVal) val).i);
+		}
+		else if (n.op == UOP.NOT)
+		{
+			res = new BoolVal(!((BoolVal) val).b);
+		}
+		else
+		{
+			throw new IntException("Wrong op in Unop inst: " + n.op);
+		}
+		
+		assign(n.dst, res);
+		
 		return CONTINUE;
 	}
 	
@@ -289,9 +418,11 @@ public class IR1Interp
 	//
 	static int execute(IR1.Move n) throws Exception
 	{
+		Val val = evaluate(n.src);
 		
-		// ... code needed ...
+		assign(n.dst, val);
 		
+		return CONTINUE;
 	}
 	
 	// Load ---
@@ -323,9 +454,19 @@ public class IR1Interp
 	//
 	static int execute(IR1.CJump n) throws Exception
 	{
+		boolean result = evaluate(n.op, n.src1, n.src2);
 		
-		// ... code needed ...
+		if (!result)
+		{
+			return CONTINUE;
+		}
 		
+		if (env != null && env.getLabelLocation(n.lab.name) != null)
+		{
+			return env.getLabelLocation(n.lab.name);
+		}
+		
+		throw new IntException("The label is not defined: " + n.lab.name + ".");
 	}
 	
 	// Jump ---
@@ -333,9 +474,12 @@ public class IR1Interp
 	//
 	static int execute(IR1.Jump n) throws Exception
 	{
+		if (env != null && env.getLabelLocation(n.lab.name) != null)
+		{
+			return env.getLabelLocation(n.lab.name);
+		}
 		
-		// ... code needed ...
-		
+		throw new IntException("The label is not defined: " + n.lab.name + ".");
 	}
 	
 	// Call ---
@@ -355,14 +499,13 @@ public class IR1Interp
 	//
 	static int execute(IR1.Return n) throws Exception
 	{
-		
-		// ... code needed ...
+		returnVal = evaluate(n.val);
 		
 		return RETURN;
 	}
 	
 	// -----------------------------------------------------------------
-	// Evaluatation routines for address
+	// Evaluation routines for address
 	// -----------------------------------------------------------------
 	//
 	// - Returns an integer (representing index to the heap memory).
@@ -379,28 +522,172 @@ public class IR1Interp
 	}
 	
 	// -----------------------------------------------------------------
-	// Evaluatation routines for operands
+	// Evaluation routines for operands
 	// -----------------------------------------------------------------
 	//
 	// - Each evaluate() routine returns a Val object.
 	//
 	static Val evaluate(IR1.Src n) throws Exception
 	{
-		Val val;
-		// if (n instanceof IR1.Temp) val =
-		// if (n instanceof IR1.Id) val =
-		// if (n instanceof IR1.IntLit) val =
-		// if (n instanceof IR1.BoolLit) val =
-		// if (n instanceof IR1.StrLit) val =
+		Val val = null;
+		
+		if (n instanceof IntLit)
+		{
+			return new IntVal(((IntLit) n).i);
+		}
+		else if (n instanceof BoolLit)
+		{
+			return new BoolVal(((BoolVal) n).b);
+		}
+		else if (n instanceof StrLit)
+		{
+			return new StrVal(((StrLit) n).s);
+		}
+		
+		// TODO: Will need to look over this when answered about globals.
+		if (n instanceof IR1.Temp)
+		{
+			IR1.Temp temp = (IR1.Temp) n;
+			val = env != null && env.getTempVal(temp.num) != null ? env
+					.getTempVal(temp.num) : null;
+			
+			if (val == null)
+			{
+				throw new IntException(
+						"The temporary variable is not defined: " + temp.num
+								+ ".");
+			}
+		}
+		else if (n instanceof IR1.Id)
+		{
+			IR1.Id id = (IR1.Id) n;
+			val = env != null && env.getVarVal(id.name) != null ? env
+					.getVarVal(id.name) : null;
+			
+			if (val == null)
+			{
+				throw new IntException("The variable is not defined: "
+						+ id.name + ".");
+			}
+		}
+		
 		return val;
 	}
 	
 	static Val evaluate(IR1.Dest n) throws Exception
 	{
-		Val val;
-		// if (n instanceof IR0.Temp) val =
-		// if (n instanceof IR0.Id) val =
+		Val val = null;
+		
+		// TODO: Will need to look over this when answered about globals.
+		if (n instanceof IR1.Temp)
+		{
+			IR1.Temp temp = (IR1.Temp) n;
+			val = env != null && env.getTempVal(temp.num) != null ? env
+					.getTempVal(temp.num) : null;
+			
+			if (val == null)
+			{
+				throw new IntException(
+						"The temporary variable is not defined: " + temp.num
+								+ ".");
+			}
+		}
+		else if (n instanceof IR1.Id)
+		{
+			IR1.Id id = (IR1.Id) n;
+			val = env != null && env.getVarVal(id.name) != null ? env
+					.getVarVal(id.name) : null;
+			
+			if (val == null)
+			{
+				throw new IntException("The variable is not defined: "
+						+ id.name + ".");
+			}
+		}
+		
 		return val;
+	}
+	
+	static boolean evaluate(ROP op, Src src1, Src src2) throws Exception
+	{
+		Val lhs = evaluate(src1);
+		Val rhs = evaluate(src2);
+		
+		if (!lhs.getClass().getName().equals(rhs.getClass().getName()))
+		{
+			throw new IntException(
+					"The left and right hand operands do not match types.");
+		}
+		
+		if (lhs instanceof BoolVal)
+		{
+			if (ROP.EQ == op)
+			{
+				return ((BoolVal) lhs).b == ((BoolVal) rhs).b;
+			}
+			else if (ROP.NE == op)
+			{
+				return ((BoolVal) lhs).b == ((BoolVal) rhs).b;
+			}
+			
+			throw new IntException(
+					"The following operator cannot be performed on booleans: "
+							+ op + ".");
+		}
+		
+		int result = 0;
+		if (lhs instanceof StrVal)
+		{
+			result = ((StrVal) lhs).s.compareTo(((StrVal) rhs).s);
+		}
+		else if (lhs instanceof IntVal)
+		{
+			result = Integer.compare(((IntVal) lhs).i, ((IntVal) rhs).i);
+		}
+		else
+		{
+			throw new IntException("The following value type was not handled: "
+					+ lhs.getClass().getName() + ".");
+		}
+		
+		if (op == ROP.EQ)
+		{
+			return result == 0;
+		}
+		else if (op == ROP.NE)
+		{
+			return result != 0;
+		}
+		else if (op == ROP.LT)
+		{
+			return result < 0;
+		}
+		else if (op == ROP.GT)
+		{
+			return result > 0;
+		}
+		else if (op == ROP.LE)
+		{
+			return result <= 0;
+		}
+		else if (op == ROP.GE)
+		{
+			return result >= 0;
+		}
+		
+		throw new IntException("Unhandled ROP: " + op + ".");
+	}
+	
+	static Val evaluate(AOP op, Src src1, Src src2) throws Exception
+	{
+		// TODO, there is ADD("+"), SUB("-"), MUL("*"), DIV("/"), AND("&&"), OR("||"),
+		//       this can return an integer or bool.
+		return null;
+	}
+	
+	static void assign(Dest dest, Val value)
+	{
+		// TODO eval dest, update the value.
 	}
 	
 }
