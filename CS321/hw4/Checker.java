@@ -1,3 +1,7 @@
+//
+// HW4 by Ian Aldrighetti
+//      Fall 2014
+//
 // This is supporting software for CS322 Compilers and Language Design II
 // Copyright (c) Portland State University
 //
