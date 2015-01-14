@@ -544,7 +544,6 @@ public class IR1Interp
 			return new StrVal(((StrLit) n).s);
 		}
 		
-		// TODO: Will need to look over this when answered about globals.
 		if (n instanceof IR1.Temp)
 		{
 			IR1.Temp temp = (IR1.Temp) n;
@@ -687,7 +686,31 @@ public class IR1Interp
 	
 	static void assign(Dest dest, Val value)
 	{
-		// TODO eval dest, update the value.
+		Val destVal = evaluate(dest);
+		
+		// Ensure the types are identical.
+		if (destVal.getClass().getName().equals(value.getClass().getName()))
+		{
+			// TODO UndVal
+			if (destVal instanceof IntVal)
+			{
+				((IntVal) destVal).i = ((IntVal) value).i;
+			}
+			else if (destVal instanceof BoolVal)
+			{
+				((BoolVal) destVal).b = ((BoolVal) value).b;
+			}
+			else if (destVal instanceof StrVal)
+			{
+				((StrVal) destVal).s = ((StrVal) value).s;
+			}
+			else
+			{
+				throw new IntException("Unhandled assign type: " + destVal.getClass().getName());
+			}
+		}
+		
+		throw new IntException("The value attempting to be assigned does not match the destination's type.");
 	}
 	
 }
