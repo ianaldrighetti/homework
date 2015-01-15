@@ -2,24 +2,26 @@
 // A starting version of IR1 interpreter. (For CS322 W15 Assignment 1)
 //
 //
-import java.util.*;
-import java.io.*;
-
-import ir1.*;
+import ir1.IR1;
 import ir1.IR1.AOP;
 import ir1.IR1.BoolLit;
 import ir1.IR1.Dest;
+import ir1.IR1.Id;
 import ir1.IR1.Inst;
 import ir1.IR1.IntLit;
-import ir1.IR1.Jump;
-import ir1.IR1.Label;
 import ir1.IR1.LabelDec;
 import ir1.IR1.ROP;
-import ir1.IR1.Return;
 import ir1.IR1.Src;
 import ir1.IR1.StrLit;
 import ir1.IR1.Temp;
 import ir1.IR1.UOP;
+import ir1.ir1Parser;
+
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
 
 public class IR1Interp
 {
@@ -149,7 +151,12 @@ public class IR1Interp
 		
 		public Val getTempVal(Integer identifier)
 		{
-				return tempMap.get(identifier);
+			if (!tempMap.containsKey(identifier))
+			{
+				tempMap.put(identifier, new UndVal());
+			}
+			
+			return tempMap.get(identifier);
 		}
 		
 		public void setTempVal(Integer identifier, Val value)
@@ -277,6 +284,7 @@ public class IR1Interp
 		// Regardless, make a new environment.
 		env = new Environment();
 		
+		// Gather all the labels in this function, if any.
 		for (int offset = 0; offset < n.code.length; offset++)
 		{
 			Inst instr = n.code[offset];
@@ -288,6 +296,12 @@ public class IR1Interp
 			
 			LabelDec labelDecl = (LabelDec) instr;
 			env.setLabelLocation(labelDecl.name, offset);
+		}
+		
+		// Define the variables.
+		for (String variable : n.locals)
+		{
+			env.setVarVal(variable, new UndVal());
 		}
 		
 		// The fetch-and-execute loop
@@ -431,9 +445,11 @@ public class IR1Interp
 	//
 	static int execute(IR1.Load n) throws Exception
 	{
+		int src = evalute(n.addr);
 		
-		// ... code needed ...
+		assign(n.dst, heap.get(src));
 		
+		return CONTINUE;
 	}
 	
 	// Store ---
@@ -443,7 +459,12 @@ public class IR1Interp
 	static int execute(IR1.Store n) throws Exception
 	{
 		
-		// ... code needed ...
+		Val val = evaluate(n.src);
+		int dest = evalute(n.addr);
+		
+		heap.set(dest, val);
+
+		return CONTINUE;
 		
 	}
 	
@@ -489,9 +510,89 @@ public class IR1Interp
 	//
 	static int execute(IR1.Call n) throws Exception
 	{
+		// Deal with pre-defined functions.
+		if (n.name.equals("malloc"))
+		{
+			if (n.args.length != 1)
+			{
+				throw new IntException("_malloc requires 1 parameter.");
+			}
+			
+			if (n.rdst == null)
+			{
+				malloc(n.args[0]);
+				
+				return CONTINUE;
+			}
+			
+			assign(n.rdst, malloc(n.args[0]));
+			
+			return CONTINUE;
+		}
+		else if (n.name.equals("printStr") || n.name.equals("printBool") || n.name.equals("printInt"))
+		{
+			if (n.args.length == 0 && n.name.equals("printStr"))
+			{
+				System.out.println();
+				return CONTINUE;
+			}
+			
+			if (n.args.length != 1)
+			{
+				throw new IntException("_" + n.name + " requires 1 parameter.");
+			}
+			
+			Val out = evaluate(n.args[0]);
+			
+			if (out instanceof StrVal)
+			{
+				// TODO check type
+				System.out.println(((StrVal) out).s);
+			}
+			else if (out instanceof IntVal)
+			{
+				System.out.println(((IntVal) out).i);
+			}
+			else if (out instanceof BoolVal)
+			{
+				System.out.println(((BoolVal) out).b);
+			}
+			else if (out instanceof UndVal)
+			{
+				System.out.print(0);
+			}
+			else
+			{
+				throw new IntException("Unhandled type: " + out.getClass().getName() + ".");
+			}
+			
+			return CONTINUE;
+		}
 		
-		// ... code needed ...
+		System.out.println("!!! TO INVOKE: " + n.name);
+		// TODO execute function definition, also pass arguments.
 		
+		return CONTINUE;
+		
+	}
+	
+	static Val malloc(Src src) throws Exception
+	{
+		Val val = evaluate(src);
+		
+		if (!(val instanceof IntVal))
+		{
+			throw new IntException("_malloc requires the parameter to be an integer.");
+		}
+
+		int offset = heap.size();
+		
+		for (int i = 0; i < ((IntVal) val).i; i++)
+		{
+			heap.add(new UndVal());
+		}
+		
+		return new IntVal(offset);
 	}
 	
 	// Return ---
@@ -517,8 +618,22 @@ public class IR1Interp
 	static int evalute(IR1.Addr n) throws Exception
 	{
 		
-		// ... code needed ...
+		Val base = evaluate(n.base);
 		
+		if (!(base instanceof IntVal))
+		{
+			throw new IntException("The location specified must be an integer.");
+		}
+		
+		int offset = ((IntVal) base).i + n.offset;
+		System.out.println(offset);
+		System.out.println(heap.size());
+		if (offset < 0 || offset >= heap.size())
+		{
+			throw new IntException("The offset is out of bounds (" + (offset < 0 ? "below 0" : "larger than heap") + ").");
+		}
+		
+		return offset;
 	}
 	
 	// -----------------------------------------------------------------
@@ -537,7 +652,7 @@ public class IR1Interp
 		}
 		else if (n instanceof BoolLit)
 		{
-			return new BoolVal(((BoolVal) n).b);
+			return new BoolVal(((BoolLit) n).b);
 		}
 		else if (n instanceof StrLit)
 		{
@@ -577,7 +692,6 @@ public class IR1Interp
 	{
 		Val val = null;
 		
-		// TODO: Will need to look over this when answered about globals.
 		if (n instanceof IR1.Temp)
 		{
 			IR1.Temp temp = (IR1.Temp) n;
@@ -679,16 +793,88 @@ public class IR1Interp
 	
 	static Val evaluate(AOP op, Src src1, Src src2) throws Exception
 	{
-		// TODO, there is ADD("+"), SUB("-"), MUL("*"), DIV("/"), AND("&&"), OR("||"),
-		//       this can return an integer or bool.
-		return null;
+		Val lhs = evaluate(src1);
+		Val rhs = evaluate(src2);
+		
+		if (!lhs.getClass().getName().equals(rhs.getClass().getName()))
+		{
+			throw new IntException("The left and right hand side must be of the same type.");
+		}
+		
+		if (lhs instanceof StrVal)
+		{
+			if (op == AOP.ADD)
+			{
+				StrVal s1 = (StrVal) lhs;
+				StrVal s2 = (StrVal) rhs;
+				
+				return new StrVal(s1.s + s2.s);
+			}
+			
+			throw new IntException("The following operator cannnot be applied to strings: " + op + ".");
+		}
+		
+		if (lhs instanceof IntVal)
+		{
+			int i1 = ((IntVal) lhs).i;
+			int i2 = ((IntVal) rhs).i;
+			int result = -1;
+			
+			if (op == AOP.ADD)
+			{
+				result = i1 + i2;
+			}
+			else if (op == AOP.SUB)
+			{
+				result = i1 - i2;
+			}
+			else if (op == AOP.MUL)
+			{
+				result = i1 * i2;
+			}
+			else if (op == AOP.DIV)
+			{
+				result = i1 / i2;
+			}
+			else
+			{
+				throw new IntException("The following operator cannot be applied to integers: " + op + ".");
+			}
+			
+			return new IntVal(result);
+		}
+		
+		if (lhs instanceof BoolVal)
+		{
+			// TODO handle BoolLit
+			boolean b1 = ((BoolVal) lhs).b;
+			boolean b2 = ((BoolVal) rhs).b;
+			boolean result = false;
+			
+			if (op == AOP.AND)
+			{
+				result = b1 && b2;
+			}
+			else if (op == AOP.OR)
+			{
+				result = b1 || b2;
+			}
+			else
+			{
+				throw new IntException("The following operator cannot be applied to integers: " + op + ".");
+			}
+			
+			return new BoolVal(result);
+		}
+		
+		throw new IntException("The following value type is not handled: " + lhs.getClass().getName() + ".");
 	}
 	
-	static void assign(Dest dest, Val value)
+	static void assign(Dest dest, Val value) throws Exception
 	{
 		Val destVal = evaluate(dest);
 		
-		// Ensure the types are identical.
+		// If the tyes are identical, it's much easier.
 		if (destVal.getClass().getName().equals(value.getClass().getName()))
 		{
 			// TODO UndVal
@@ -708,9 +894,26 @@ public class IR1Interp
 			{
 				throw new IntException("Unhandled assign type: " + destVal.getClass().getName());
 			}
+			
+			return;
 		}
 		
-		throw new IntException("The value attempting to be assigned does not match the destination's type.");
+		if (dest instanceof Temp)
+		{
+			Temp temp = (Temp) dest;
+			
+			env.setTempVal(temp.num, value);
+			return;
+		}
+		else if (dest instanceof Id)
+		{
+			Id id = (Id) dest;
+			
+			env.setVarVal(id.name, value);
+			return;
+		}
+		
+		throw new IntException("Unhandled assignment case: " + dest.getClass().getName() + ".");
 	}
 	
 }
