@@ -20,6 +20,7 @@ import ir1.ir1Parser;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -205,6 +206,8 @@ public class IR1Interp
 	
 	static Stack<Environment> callStack = new Stack<Environment>();
 	
+	static List<Val> funcArgs = null; 
+	
 	// Execution status
 	// - tells whether to continue with the nest inst, to jump to
 	// a new target inst, or to return to the caller
@@ -297,6 +300,29 @@ public class IR1Interp
 			LabelDec labelDecl = (LabelDec) instr;
 			env.setLabelLocation(labelDecl.name, offset);
 		}
+		
+		// If any arguments were not passed and there should be, throw an error.
+		if (n.params.length > 0 && (funcArgs == null || funcArgs.isEmpty()))
+		{
+			throw new IntException("The function defined with parameters was invoked with none: " + n.name + ".");
+		}
+		else if (funcArgs != null && n.params.length != funcArgs.size())
+		{
+			throw new IntException("The function " + n.name + " expected " + n.params.length + " arguments, but got " + funcArgs.size() + ".");
+		}
+		else if (funcArgs != null && !funcArgs.isEmpty())
+		{
+			for (int index = 0; index < n.params.length; index++)
+			{
+				String param = n.params[index];
+				Val value = funcArgs.get(index);
+				
+				env.setVarVal(param, value);
+			}
+		}
+		
+		// Always reset funcArgs, just in case.
+		funcArgs = null;
 		
 		// Define the variables.
 		for (String variable : n.locals)
@@ -559,7 +585,7 @@ public class IR1Interp
 			}
 			else if (out instanceof UndVal)
 			{
-				System.out.print(0);
+				System.out.println("UndVal");
 			}
 			else
 			{
@@ -569,8 +595,29 @@ public class IR1Interp
 			return CONTINUE;
 		}
 		
-		System.out.println("!!! TO INVOKE: " + n.name);
 		// TODO execute function definition, also pass arguments.
+		
+		IR1.Func funcDef = funcMap.get(n.name);
+		
+		if (funcDef == null)
+		{
+			throw new IntException("Call to undefined function: " + n.name + ".");
+		}
+		
+		funcArgs = new ArrayList<Val>();
+		
+		for (Src arg : n.args)
+		{
+			funcArgs.add(evaluate(arg));
+		}
+		
+		execute(funcDef);
+		
+		if (n.rdst != null)
+		{
+			assign(n.rdst, returnVal);
+			returnVal = new UndVal();
+		}
 		
 		return CONTINUE;
 		
@@ -626,8 +673,7 @@ public class IR1Interp
 		}
 		
 		int offset = ((IntVal) base).i + n.offset;
-		System.out.println(offset);
-		System.out.println(heap.size());
+		
 		if (offset < 0 || offset >= heap.size())
 		{
 			throw new IntException("The offset is out of bounds (" + (offset < 0 ? "below 0" : "larger than heap") + ").");
