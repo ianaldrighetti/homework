@@ -1,6 +1,6 @@
 // 
 // A starting version of IR1 interpreter. (For CS322 W15 Assignment 1)
-//
+// Assignment by Ian Aldrighetti
 //
 import ir1.IR1;
 import ir1.IR1.AOP;
