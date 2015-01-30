@@ -129,15 +129,22 @@ public class IR1Interp
 	 */
 	static class Environment
 	{
+		private String funcName;
 		private Map<String, Integer> labelMap;
 		private Map<Integer, Val> tempMap;
 		private Map<String, Val> varMap;
 		
-		public Environment()
+		public Environment(String funcName)
 		{
+			this.funcName = funcName;
 			labelMap = new HashMap<String, Integer>();
 			tempMap = new HashMap<Integer, IR1Interp.Val>();
 			varMap = new HashMap<String, IR1Interp.Val>();
+		}
+		
+		public String getFuncName()
+		{
+			return funcName;
 		}
 		
 		public Integer getLabelLocation(String label)
@@ -285,7 +292,7 @@ public class IR1Interp
 		}
 		
 		// Regardless, make a new environment.
-		env = new Environment();
+		env = new Environment(n.name);
 		
 		// Gather all the labels in this function, if any.
 		for (int offset = 0; offset < n.code.length; offset++)
@@ -489,7 +496,7 @@ public class IR1Interp
 		int dest = evalute(n.addr);
 		
 		heap.set(dest, val);
-
+		
 		return CONTINUE;
 		
 	}
@@ -921,7 +928,7 @@ public class IR1Interp
 		Val destVal = evaluate(dest);
 		
 		// If the tyes are identical, it's much easier.
-		if (destVal.getClass().getName().equals(value.getClass().getName()))
+		/*if (destVal.getClass().getName().equals(value.getClass().getName()))
 		{
 			// TODO UndVal
 			if (destVal instanceof IntVal)
@@ -942,24 +949,45 @@ public class IR1Interp
 			}
 			
 			return;
-		}
+		}*/
 		
 		if (dest instanceof Temp)
 		{
 			Temp temp = (Temp) dest;
 			
-			env.setTempVal(temp.num, value);
+			env.setTempVal(temp.num, duplicate(value));
 			return;
 		}
 		else if (dest instanceof Id)
 		{
 			Id id = (Id) dest;
 			
-			env.setVarVal(id.name, value);
+			env.setVarVal(id.name, duplicate(value));
 			return;
 		}
 		
 		throw new IntException("Unhandled assignment case: " + dest.getClass().getName() + ".");
 	}
 	
+	static Val duplicate(Val value) throws Exception
+	{
+		if (value instanceof IntVal)
+		{
+			return new IntVal(((IntVal) value).i);
+		}
+		else if (value instanceof StrVal)
+		{
+			return new StrVal(((StrVal) value).s);
+		}
+		else if (value instanceof BoolVal)
+		{
+			return new BoolVal(((BoolVal) value).b);
+		}
+		else if (value instanceof UndVal)
+		{
+			return new UndVal();
+		}
+		
+		throw new IntException("Unhandled type: " + value.getClass().getName());
+	}
 }
