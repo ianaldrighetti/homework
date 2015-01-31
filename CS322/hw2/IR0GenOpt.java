@@ -7,13 +7,21 @@
 //
 //
 import ir0.IR0;
+import ir0.IR0.BOP;
+import ir0.IR0.ROP;
+import ir0.IR0.Src;
+import ir0.IR0.Temp;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import ast0.Ast0;
+import ast0.Ast0.BoolLit;
+import ast0.Ast0.IntLit;
+import ast0.Ast0.UOP;
 import ast0.ast0Parser;
+import ast0.Ast0.Exp;
 
 class IR0GenOpt
 {
@@ -76,7 +84,7 @@ class IR0GenOpt
 			FileInputStream stream = new FileInputStream(args[0]);
 			Ast0.Program p = new ast0Parser(stream).Program();
 			stream.close();
-			IR0.Program ir0 = IR0Gen.gen(p);
+			IR0.Program ir0 = IR0GenOpt.gen(p);
 			System.out.print(ir0.toString());
 		}
 		else
@@ -94,8 +102,10 @@ class IR0GenOpt
 	public static IR0.Program gen(Ast0.Program n) throws Exception
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
+		
 		for (Ast0.Stmt s : n.stmts)
 			code.addAll(gen(s));
+		
 		return new IR0.Program(code);
 	}
 	
@@ -126,6 +136,7 @@ class IR0GenOpt
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		CodePack rhs = gen(n.rhs);
 		code.addAll(rhs.code);
+		
 		if (n.lhs instanceof Ast0.Id)
 		{
 			IR0.Dest lhs = new IR0.Id(((Ast0.Id) n.lhs).nm);
@@ -277,13 +288,110 @@ class IR0GenOpt
 	static CodePack genAOP(Ast0.Binop n) throws Exception
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
+		
 		CodePack l = gen(n.e1);
 		CodePack r = gen(n.e2);
+		
+		// TODO look at CodePack contents instead, it's recursive.
+		if (isLiteral(l.src, r.src))
+		{	
+			Src src = getLiteral(gen(n.op), l.src, r.src);
+			
+			return new CodePack(src, code);
+		}
+		
 		IR0.Temp t = new IR0.Temp();
 		code.addAll(l.code);
 		code.addAll(r.code);
 		code.add(new IR0.Binop(gen(n.op), t, l.src, r.src));
+		
 		return new CodePack(t, code);
+	}
+	
+	static boolean isLiteral(Exp e)
+	{
+		return e instanceof IntLit || e instanceof BoolLit;
+	}
+	
+	static boolean isLiteral(Src src)
+	{
+		return src instanceof IR0.IntLit || src instanceof IR0.BoolLit;
+	}
+	
+	static boolean isLiteral(Src src1, Src src2)
+	{
+		return (src1 instanceof IR0.IntLit && src2 instanceof IR0.IntLit) || (src1 instanceof IR0.BoolLit && src2 instanceof IR0.BoolLit);
+	}
+	
+	static Src getLiteral(UOP op, Src src) throws Exception
+	{
+		if (src instanceof IR0.IntLit)
+		{
+			int i = ((IR0.IntLit) src).i;
+			
+			if (op == UOP.NOT)
+			{
+				throw new GenException("NOT cannot be applied to integers.");
+			}
+			
+			return new IR0.IntLit(-i);
+		}
+		else if (src instanceof IR0.BoolLit)
+		{
+			boolean b = ((IR0.BoolLit) src).b;
+			
+			if (op == UOP.NEG)
+			{
+				throw new GenException("NEG cannot be applied to booleans.");
+			}
+			
+			return new IR0.BoolLit(!b);
+		}
+		
+		throw new IllegalArgumentException("Unhandled getLiteral(UOP, src): " + src.getClass().getName());
+	}
+	
+	static Src getLiteral(BOP op, Src e1, Src e2)
+	{
+		if (e1 instanceof IR0.IntLit && e2 instanceof IR0.IntLit)
+		{
+			return calculate(op, (IR0.IntLit)e1, (IR0.IntLit)e2);
+		}
+		
+		throw new IllegalArgumentException("Expressions do not match types.");
+	}
+	
+	static Src calculate(BOP op, IR0.IntLit i1, IR0.IntLit i2)
+	{
+		int l = i1.i;
+		int r = i2.i;
+		int result = Integer.MIN_VALUE;
+		
+		String operator = op.toString();
+		
+		switch(operator)
+		{
+			case "+":
+				result = l + r;
+				break;
+			
+			case "-":
+				result = l - r;
+				break;
+				
+			case "/":
+				result = l / r;
+				break;
+			
+			case "*":
+				result = l * r;
+				break;
+			
+			default:
+				throw new IllegalArgumentException("Unhandled int operator: " + operator);
+		}
+		
+		return new IR0.IntLit(result);
 	}
 	
 	// Ast0.Binop --- logical op case
@@ -363,6 +471,14 @@ class IR0GenOpt
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		CodePack p = gen(n.e);
+		
+		if (isLiteral(p.src))
+		{
+			Src src = getLiteral(n.op, p.src);
+			
+			return new CodePack(src, code);
+		}
+		
 		code.addAll(p.code);
 		IR0.UOP op = (n.op == Ast0.UOP.NEG) ? IR0.UOP.NEG : IR0.UOP.NOT;
 		IR0.Temp t = new IR0.Temp();
