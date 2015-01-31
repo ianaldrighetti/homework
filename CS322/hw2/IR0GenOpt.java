@@ -16,6 +16,8 @@ import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.management.openmbean.OpenDataException;
+
 import ast0.Ast0;
 import ast0.Ast0.BoolLit;
 import ast0.Ast0.IntLit;
@@ -177,6 +179,9 @@ class IR0GenOpt
 		code.addAll(p.code);
 		code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L1));
 		code.addAll(gen(n.s1));
+		
+		//System.out.println("IF: " + p.src);
+		
 		if (n.s2 == null)
 		{
 			code.add(new IR0.LabelDec(L1));
@@ -292,7 +297,6 @@ class IR0GenOpt
 		CodePack l = gen(n.e1);
 		CodePack r = gen(n.e2);
 		
-		// TODO look at CodePack contents instead, it's recursive.
 		if (isLiteral(l.src, r.src))
 		{	
 			Src src = getLiteral(gen(n.op), l.src, r.src);
@@ -413,21 +417,122 @@ class IR0GenOpt
 	//
 	static CodePack genLOP(Ast0.Binop n) throws Exception
 	{
+		CodePack l = gen(n.e1);
+		CodePack r = gen(n.e2);
+		
+		// Begin optimization for logical statements (&& and ||).
+		if (isStaticLogic(n.op, l.src, r.src))
+		{
+			Src src = getStaticLogic(n.op, l.src, r.src);
+			
+			return new CodePack(src);
+		}
+		
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		IR0.BoolLit val = (n.op == Ast0.BOP.OR) ? IR0.TRUE : IR0.FALSE;
 		IR0.BoolLit nval = (n.op == Ast0.BOP.OR) ? IR0.FALSE : IR0.TRUE;
 		IR0.Temp t = new IR0.Temp();
 		IR0.Label L = new IR0.Label();
 		code.add(new IR0.Move(t, val));
-		CodePack l = gen(n.e1);
+		
 		code.addAll(l.code);
 		code.add(new IR0.CJump(IR0.ROP.EQ, l.src, val, L));
-		CodePack r = gen(n.e2);
+		
 		code.addAll(r.code);
 		code.add(new IR0.CJump(IR0.ROP.EQ, r.src, val, L));
 		code.add(new IR0.Move(t, nval));
 		code.add(new IR0.LabelDec(L));
 		return new CodePack(t, code);
+	}
+	
+	static boolean isStaticLogic(Ast0.BOP op, Src l, Src r)
+	{
+		switch(op.toString())
+		{
+			case "||":
+				return isStaticLogicOR(l, r);
+			
+			case "&&":
+				return isStaticLogicAND(l, r);
+			
+			default:
+				throw new IllegalArgumentException("Unhandled isStaticLogic operator: " + op);
+		}
+	}
+	
+	static boolean isStaticLogicOR(Src l, Src r)
+	{
+		// If they're both literals, they're static.
+		if (l instanceof IR0.BoolLit && r instanceof IR0.BoolLit)
+		{
+			return true;
+		}
+		
+		// This means one or both aren't literals... but if one is and evals to true, it can be
+		// made static.
+		boolean lhs = (l instanceof IR0.BoolLit && ((IR0.BoolLit) l).b);
+		boolean rhs = (r instanceof IR0.BoolLit && ((IR0.BoolLit) r).b);
+		
+		return lhs || rhs;
+		
+		// TODO may need to handle variables that are static???
+	}
+	
+	static boolean isStaticLogicAND(Src l, Src r)
+	{
+		// A static AND can occur if both are boolean literals.
+		if (l instanceof IR0.BoolLit && r instanceof IR0.BoolLit)
+		{
+			return true;
+		}
+		
+		// Another case is if one is a boolean literal and it's false.
+		boolean lhs = (l instanceof IR0.BoolLit && !((IR0.BoolLit) l).b);
+		boolean rhs = (r instanceof IR0.BoolLit && !((IR0.BoolLit) r).b);
+		
+		// lhs/rhs will be true if it is a literal false, which means it can be made static.
+		return lhs || rhs;
+	}
+	
+	static Src getStaticLogic(Ast0.BOP op, Src l, Src r)
+	{
+		switch(op.toString())
+		{
+			case "||":
+				return getStaticLogicOR(l, r);
+			
+			case "&&":
+				return getStaticLogicAND(l, r);
+			
+			default:
+				throw new IllegalArgumentException("Unhandled getStaticLogic operator: " + op);
+		}
+	}
+	
+	static Src getStaticLogicOR(Src l, Src r)
+	{
+		boolean lhs = (l instanceof IR0.BoolLit && ((IR0.BoolLit) l).b);
+		boolean rhs = (r instanceof IR0.BoolLit && ((IR0.BoolLit) r).b);
+		
+		// If just one is a boolean literal and is true, then it will always be true.
+		return new IR0.BoolLit(lhs || rhs);
+	}
+	
+	static Src getStaticLogicAND(Src l, Src r)
+	{
+		if (l instanceof IR0.BoolLit && r instanceof IR0.BoolLit)
+		{
+			boolean lhs = (l instanceof IR0.BoolLit && ((IR0.BoolLit) l).b);
+			boolean rhs = (r instanceof IR0.BoolLit && ((IR0.BoolLit) r).b);
+			
+			return new IR0.BoolLit(lhs && rhs);
+		}
+		
+		boolean lhs = (l instanceof IR0.BoolLit && !((IR0.BoolLit) l).b);
+		boolean rhs = (r instanceof IR0.BoolLit && !((IR0.BoolLit) r).b);
+
+		// TODO this is right here, but is it right in isStaticLogicAND?
+		return new IR0.BoolLit(!(lhs || rhs));
 	}
 	
 	// Ast0.Binop --- relational op case
@@ -445,6 +550,7 @@ class IR0GenOpt
 	//
 	static CodePack genROP(Ast0.Binop n) throws Exception
 	{
+		System.out.println("RELATION");
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		CodePack l = gen(n.e1);
 		CodePack r = gen(n.e2);
