@@ -752,9 +752,27 @@ class IR0GenOpt
 	//
 	static CodePack gen(Ast0.ArrayElm n) throws Exception
 	{
+//		CodePack cp = gen(n.idx);
+//		
+//		if (cp.src instanceof IR0.IntLit)
+//		{
+//			System.out.println("STATIC ACCESS: " + (((IR0.IntLit) cp.src).i * 4));
+//			
+//			List<IR0.Inst> code = new ArrayList<>();
+//			
+//			Ast0.Id id = (Ast0.Id) n.ar;
+//			
+//			//System.out.println("\t" + n.ar.getClass().getName());
+//			code.add();
+//			
+//			return new CodePack(new IR0.Addr(new IR0.Id(id.nm), (((IR0.IntLit) cp.src).i * 4)), code);
+//		}
+		
 		AddrPack p = genAddr(n);
+		
 		IR0.Temp t = new IR0.Temp();
 		p.code.add(new IR0.Load(t, p.addr));
+		
 		return new CodePack(t, p.code);
 	}
 	
@@ -763,6 +781,18 @@ class IR0GenOpt
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		CodePack ar = gen(n.ar);
 		CodePack idx = gen(n.idx);
+		
+		// Address optimization.
+		if (idx.src instanceof IR0.IntLit)
+		{
+			int offset = ((IR0.IntLit) idx.src).i * 4;
+			
+			code.addAll(ar.code);
+			code.addAll(idx.code);
+			
+			return new AddrPack(new IR0.Addr(ar.src, offset), code);
+		}
+		
 		code.addAll(ar.code);
 		code.addAll(idx.code);
 		IR0.Temp t1 = new IR0.Temp();
