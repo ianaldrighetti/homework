@@ -239,10 +239,20 @@ class IR0GenOpt
 	static List<IR0.Inst> gen(Ast0.While n) throws Exception
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
+		
+		CodePack p = gen(n.cond);
+		
+		// A literal false? 
+		if (p.src instanceof IR0.BoolLit && !((IR0.BoolLit) p.src).b)
+		{
+			// Do nothing... as in, don't add anything.
+			return code;
+		}
+		
 		IR0.Label L1 = new IR0.Label();
 		IR0.Label L2 = new IR0.Label();
 		code.add(new IR0.LabelDec(L1));
-		CodePack p = gen(n.cond);
+		
 		code.addAll(p.code);
 		code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L2));
 		code.addAll(gen(n.s));

@@ -1,0 +1,9 @@
+# IR0 Program
+ x = true
+ print (false)
+ y = false
+L0:
+ if y == false goto L1
+ print (2)
+ goto L0
+L1:
