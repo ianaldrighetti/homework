@@ -170,13 +170,21 @@ class IR0GenOpt
 	static List<IR0.Inst> gen(Ast0.If n) throws Exception
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
-		IR0.Label L1 = new IR0.Label();
+		
 		CodePack p = gen(n.cond);
 		code.addAll(p.code);
+		
+		// Optimization for static if statements (e.g. condition is always true or always false).
+		if (p.src instanceof IR0.BoolLit)
+		{
+			return getStaticIfCodePack(((IR0.BoolLit) p.src).b, n, code);
+		}
+		
+		IR0.Label L1 = new IR0.Label();
 		code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L1));
 		code.addAll(gen(n.s1));
 		
-		//System.out.println("IF: " + p.src);
+		System.out.println("IF: " + p.src);
 		
 		if (n.s2 == null)
 		{
@@ -190,6 +198,28 @@ class IR0GenOpt
 			code.addAll(gen(n.s2));
 			code.add(new IR0.LabelDec(L2));
 		}
+		return code;
+	}
+	
+	static List<IR0.Inst> getStaticIfCodePack(boolean cond, Ast0.If n, List<IR0.Inst> code) throws Exception
+	{
+		// If it's true, then just the contents within the if.
+		if (cond)
+		{
+			code.addAll(gen(n.s1));
+		}
+		// Otherwise if it is false and there is an else body, just the else body.
+		else if (!cond && n.s2 != null)
+		{
+			code.addAll(gen(n.s2));
+		}
+		else
+		{
+			// TODO check this?
+			// If it's always false but there is no else body, remove everything.
+			code.clear();
+		}
+		
 		return code;
 	}
 	
