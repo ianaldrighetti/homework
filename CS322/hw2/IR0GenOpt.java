@@ -55,6 +55,18 @@ class IR0GenOpt
 		}
 	}
 	
+	static class EmbeddedComparison 
+	{
+		IR0.Inst comp;
+		List<IR0.Inst> code;
+		
+		public EmbeddedComparison(IR0.Inst comp, List<IR0.Inst> code)
+		{
+			this.comp = comp;
+			this.code = code;
+		}
+	}
+	
 	// For returning <addr,code> pair from genAddr routines
 	//
 	static class AddrPack
@@ -224,6 +236,42 @@ class IR0GenOpt
 		}
 		
 		return code;
+	}
+	
+	static EmbeddedComparison getEmbeddedComparison(Ast0.If n, IR0.Label label) throws Exception
+	{
+		return (n.cond instanceof Ast0.Binop) ? getEmbeddedComparison((Ast0.Binop) n.cond, label) : null;
+	}
+	
+	static EmbeddedComparison getEmbeddedComparison(Ast0.While n, IR0.Label label) throws Exception
+	{
+		return (n.cond instanceof Ast0.Binop) ? getEmbeddedComparison((Ast0.Binop) n.cond, label) : null;
+	}
+	
+	static EmbeddedComparison getEmbeddedComparison(Ast0.Binop comp, IR0.Label label) throws Exception
+	{
+		if (!isROP(comp.op))
+		{
+			return null;
+		}
+		
+		CodePack lhs = gen(comp.e1);
+		CodePack rhs = gen(comp.e2);
+		
+		// If it is a static relation, our other optimizer will intervene.
+		if (isStaticRelation(comp.op, lhs.src, rhs.src))
+		{
+			return null;
+		}
+		
+		List<IR0.Inst> code = new ArrayList<>();
+		
+		code.addAll(lhs.code);
+		code.addAll(rhs.code);
+		
+		IR0.Inst cjump = new IR0.CJump(getInvertedOperator((IR0.ROP) gen(comp.op)), lhs.src, rhs.src, label);
+		
+		return new EmbeddedComparison(cjump, code);
 	}
 	
 	static boolean isComparisonEmbeddable(Ast0.If n) throws Exception
