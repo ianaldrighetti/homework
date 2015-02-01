@@ -6,22 +6,11 @@
 >  t1 = a + 1
 >  t2 = b - 1
 >  if t1 <= t2 goto L0
-9,14d8
-< L2:
-<  t5 = a + 1
-<  t6 = b + 1
-<  t7 = true
-<  if t5 > t6 goto L1
-<  t7 = false
-16c10,12
-<  if t7 == false goto L3
+10,12c10,12
+<  t7 = a + 1
+<  t8 = b + 1
+<  if t7 <= t8 goto L2
 ---
 >  t3 = a + 1
 >  t4 = b + 1
 >  if t3 <= t4 goto L2
-18,19c14,15
-<  goto L2
-< L3:
----
->  goto L1
-> L2:

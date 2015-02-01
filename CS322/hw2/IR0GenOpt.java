@@ -228,6 +228,7 @@ class IR0GenOpt
 	
 	static boolean isComparisonEmbeddable(Ast0.If n) throws Exception
 	{
+		// TODO Unop?
 		// Must be relational.
 		if (!(n.cond instanceof Ast0.Binop) || !isROP(((Ast0.Binop) n.cond).op))
 		{
@@ -245,7 +246,37 @@ class IR0GenOpt
 		return !isStaticRelation(comp.op, l.src, r.src);
 	}
 	
+	static boolean isComparisonEmbeddable(Ast0.While n) throws Exception
+	{
+		// TODO Unop.
+		// Must be a relational. 
+		if (!(n.cond instanceof Ast0.Binop) || !isROP(((Ast0.Binop) n.cond).op))
+		{
+			return false;
+		}
+		
+		Ast0.Binop comp = (Ast0.Binop) n.cond;
+		
+		CodePack l = gen(comp.e1);
+		CodePack r = gen(comp.e2);
+		
+		return !isStaticRelation(comp.op, l.src, r.src);
+	}
+	
 	static IR0.Inst getEmbeddableComparisonInst(Ast0.If n, IR0.Label label, List<IR0.Inst> code) throws Exception
+	{
+		Ast0.Binop comp = (Ast0.Binop) n.cond;
+		
+		CodePack lhs = gen(comp.e1);
+		CodePack rhs = gen(comp.e2);
+		
+		code.addAll(lhs.code);
+		code.addAll(rhs.code);
+		
+		return new IR0.CJump(getInvertedOperator((IR0.ROP) gen(comp.op)), lhs.src, rhs.src, label);
+	}
+	
+	static IR0.Inst getEmbeddableComparisonInst(Ast0.While n, IR0.Label label, List<IR0.Inst> code) throws Exception
 	{
 		Ast0.Binop comp = (Ast0.Binop) n.cond;
 		
@@ -297,10 +328,16 @@ class IR0GenOpt
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		
-		CodePack p = gen(n.cond);
+		boolean isComparisonEmbedded = isComparisonEmbeddable(n);
+		
+		CodePack p = null;
+		if (!isComparisonEmbedded)
+		{
+			p = gen(n.cond);
+		}
 		
 		// A literal false? 
-		if (p.src instanceof IR0.BoolLit && !((IR0.BoolLit) p.src).b)
+		if (p != null && p.src instanceof IR0.BoolLit && !((IR0.BoolLit) p.src).b)
 		{
 			// Do nothing... as in, don't add anything.
 			return code;
@@ -310,13 +347,21 @@ class IR0GenOpt
 		IR0.Label L2 = new IR0.Label();
 		code.add(new IR0.LabelDec(L1));
 		
-		code.addAll(p.code);
+		if (isComparisonEmbedded)
+		{
+			code.add(getEmbeddableComparisonInst(n, L2, code));
+		}
+		else
+		{
+			// No comparison embedding, continue as usual.
+			code.addAll(p.code);
+			code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L2));
+		}
 		
-		// TODO Comparison embedding.
-		code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L2));
 		code.addAll(gen(n.s));
 		code.add(new IR0.Jump(L1));
 		code.add(new IR0.LabelDec(L2));
+		
 		return code;
 	}
 	
