@@ -8,11 +8,14 @@
 //
 import ir0.IR0;
 import ir0.IR0.BOP;
+import ir0.IR0.ROP;
 import ir0.IR0.Src;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.swing.RowFilter.ComparisonType;
 
 import ast0.Ast0;
 import ast0.Ast0.BoolLit;
@@ -171,20 +174,36 @@ class IR0GenOpt
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		
-		CodePack p = gen(n.cond);
-		code.addAll(p.code);
+		boolean isComparisonEmbedded = isComparisonEmbeddable(n);
+		CodePack p = null;
+		
+		if (!isComparisonEmbedded)
+		{
+			p = gen(n.cond);
+			code.addAll(p.code);
+		}
 		
 		// Optimization for static if statements (e.g. condition is always true or always false).
-		if (p.src instanceof IR0.BoolLit)
+		if (p != null && p.src instanceof IR0.BoolLit)
 		{
 			return getStaticIfCodePack(((IR0.BoolLit) p.src).b, n, code);
 		}
 		
 		IR0.Label L1 = new IR0.Label();
-		code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L1));
-		code.addAll(gen(n.s1));
 		
-		System.out.println("IF: " + p.src);
+		// Check if we can more efficiently embed the comparison.
+		if (isComparisonEmbedded)
+		{
+			
+			code.add(getEmbeddableComparisonInst(n, L1, code));
+		}
+		else
+		{
+			// No comparison embedding, so just do it this way.
+			code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L1));
+		}
+		
+		code.addAll(gen(n.s1));
 		
 		if (n.s2 == null)
 		{
@@ -192,13 +211,51 @@ class IR0GenOpt
 		}
 		else
 		{
-			IR0.Label L2 = new IR0.Label();
-			code.add(new IR0.Jump(L2));
-			code.add(new IR0.LabelDec(L1));
+			IR0.Label L2 = null;
+			if (!isComparisonEmbedded)
+			{
+				L2 = new IR0.Label();
+				code.add(new IR0.Jump(L2));
+				code.add(new IR0.LabelDec(L1));
+			}
+			
 			code.addAll(gen(n.s2));
-			code.add(new IR0.LabelDec(L2));
+			code.add(new IR0.LabelDec(isComparisonEmbedded ? L1 : L2));
 		}
+		
 		return code;
+	}
+	
+	static boolean isComparisonEmbeddable(Ast0.If n) throws Exception
+	{
+		// Must be relational.
+		if (!(n.cond instanceof Ast0.Binop) || !isROP(((Ast0.Binop) n.cond).op))
+		{
+			return false;
+		}
+		
+		Ast0.Binop comp = (Ast0.Binop) n.cond;
+		
+		// TODO are there cases beyond this that aren't embeddable?
+		// Why yes -- yes there are... If there is static logic.
+		
+		CodePack l = gen(comp.e1);
+		CodePack r = gen(comp.e2);
+		
+		return !isStaticRelation(comp.op, l.src, r.src);
+	}
+	
+	static IR0.Inst getEmbeddableComparisonInst(Ast0.If n, IR0.Label label, List<IR0.Inst> code) throws Exception
+	{
+		Ast0.Binop comp = (Ast0.Binop) n.cond;
+		
+		CodePack lhs = gen(comp.e1);
+		CodePack rhs = gen(comp.e2);
+		
+		code.addAll(lhs.code);
+		code.addAll(rhs.code);
+		
+		return new IR0.CJump(getInvertedOperator((IR0.ROP) gen(comp.op)), lhs.src, rhs.src, label);
 	}
 	
 	static List<IR0.Inst> getStaticIfCodePack(boolean cond, Ast0.If n, List<IR0.Inst> code) throws Exception
@@ -254,11 +311,34 @@ class IR0GenOpt
 		code.add(new IR0.LabelDec(L1));
 		
 		code.addAll(p.code);
+		
+		// TODO Comparison embedding.
 		code.add(new IR0.CJump(IR0.ROP.EQ, p.src, IR0.FALSE, L2));
 		code.addAll(gen(n.s));
 		code.add(new IR0.Jump(L1));
 		code.add(new IR0.LabelDec(L2));
 		return code;
+	}
+	
+	static IR0.ROP getInvertedOperator(IR0.ROP op)
+	{
+		switch (op)
+		{
+			case EQ:
+				return ROP.NE;
+			case GE:
+				return ROP.LT;
+			case GT:
+				return ROP.LE;
+			case LE:
+				return ROP.GT;
+			case LT:
+				return ROP.GT;
+			case NE:
+				return ROP.EQ;
+			default:
+				throw new IllegalArgumentException("Unknown IR0.ROP: " + op);
+		}
 	}
 	
 	// Ast0.Print ---

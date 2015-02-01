@@ -1,0 +1,20 @@
+# IR0 Program
+ a = 3
+ b = 3
+ t3 = a + 1
+ t4 = b - 1
+ if t3 <= t4 goto L0
+ print (1)
+L0:
+L2:
+ t5 = a + 1
+ t6 = b + 1
+ t7 = true
+ if t5 > t6 goto L1
+ t7 = false
+L1:
+ if t7 == false goto L3
+ print (2)
+ goto L2
+L3:
+ print (3)
