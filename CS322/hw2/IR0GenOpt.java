@@ -8,6 +8,7 @@
 //
 import ir0.IR0;
 import ir0.IR0.BOP;
+import ir0.IR0.Inst;
 import ir0.IR0.ROP;
 import ir0.IR0.Src;
 
@@ -57,13 +58,22 @@ class IR0GenOpt
 	
 	static class EmbeddedComparison 
 	{
-		IR0.Inst comp;
+		ROP op;
+		Src lhs;
+		Src rhs;
 		List<IR0.Inst> code;
-		
-		public EmbeddedComparison(IR0.Inst comp, List<IR0.Inst> code)
+
+		public EmbeddedComparison(ROP op, Src lhs, Src rhs, List<Inst> code)
 		{
-			this.comp = comp;
+			this.op = op;
+			this.lhs = lhs;
+			this.rhs = rhs;
 			this.code = code;
+		}
+		
+		public IR0.CJump buildCJump(IR0.Label label)
+		{
+			return new IR0.CJump(op, lhs, rhs, label);
 		}
 	}
 	
@@ -186,7 +196,8 @@ class IR0GenOpt
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		
-		boolean isComparisonEmbedded = isComparisonEmbeddable(n);
+		EmbeddedComparison embeddedComparison = getEmbeddedComparison(n, null);
+		boolean isComparisonEmbedded = embeddedComparison != null;
 		CodePack p = null;
 		
 		if (!isComparisonEmbedded)
@@ -206,8 +217,9 @@ class IR0GenOpt
 		// Check if we can more efficiently embed the comparison.
 		if (isComparisonEmbedded)
 		{
-			
-			code.add(getEmbeddableComparisonInst(n, L1, code));
+			code.addAll(embeddedComparison.code);
+			code.add(embeddedComparison.buildCJump(L1));
+			//code.add(getEmbeddableComparisonInst(n, L1, code));
 		}
 		else
 		{
@@ -269,9 +281,9 @@ class IR0GenOpt
 		code.addAll(lhs.code);
 		code.addAll(rhs.code);
 		
-		IR0.Inst cjump = new IR0.CJump(getInvertedOperator((IR0.ROP) gen(comp.op)), lhs.src, rhs.src, label);
+		//IR0.CJump cjump = new IR0.CJump(getInvertedOperator((IR0.ROP) gen(comp.op)), lhs.src, rhs.src, label);
 		
-		return new EmbeddedComparison(cjump, code);
+		return new EmbeddedComparison(getInvertedOperator((IR0.ROP) gen(comp.op)), lhs.src, rhs.src, code);
 	}
 	
 	static boolean isComparisonEmbeddable(Ast0.If n) throws Exception
@@ -376,7 +388,8 @@ class IR0GenOpt
 	{
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		
-		boolean isComparisonEmbedded = isComparisonEmbeddable(n);
+		EmbeddedComparison embeddedComparison = getEmbeddedComparison(n, null);
+		boolean isComparisonEmbedded = embeddedComparison != null;
 		
 		CodePack p = null;
 		if (!isComparisonEmbedded)
@@ -397,7 +410,10 @@ class IR0GenOpt
 		
 		if (isComparisonEmbedded)
 		{
-			code.add(getEmbeddableComparisonInst(n, L2, code));
+			//code.add(getEmbeddableComparisonInst(n, L2, code));
+			code.addAll(embeddedComparison.code);
+			
+			code.add(embeddedComparison.buildCJump(L2));
 		}
 		else
 		{
