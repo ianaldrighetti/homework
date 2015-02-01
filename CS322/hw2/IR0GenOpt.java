@@ -8,22 +8,18 @@
 //
 import ir0.IR0;
 import ir0.IR0.BOP;
-import ir0.IR0.ROP;
 import ir0.IR0.Src;
-import ir0.IR0.Temp;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.management.openmbean.OpenDataException;
-
 import ast0.Ast0;
 import ast0.Ast0.BoolLit;
+import ast0.Ast0.Exp;
 import ast0.Ast0.IntLit;
 import ast0.Ast0.UOP;
 import ast0.ast0Parser;
-import ast0.Ast0.Exp;
 
 class IR0GenOpt
 {
@@ -427,6 +423,17 @@ class IR0GenOpt
 			
 			return new CodePack(src);
 		}
+		// Simplification may still be possible. If one is a literal and the other
+		// is not, in the case of OR's we can remove the literal.
+		else if (l.src instanceof IR0.BoolLit || r.src instanceof IR0.BoolLit)
+		{
+			if (n.op.toString() == "||")
+			{
+				return new CodePack(l.src instanceof IR0.BoolLit ? r.src : l.src);
+			}
+			
+			// TODO AND's?
+		}
 		
 		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		IR0.BoolLit val = (n.op == Ast0.BOP.OR) ? IR0.TRUE : IR0.FALSE;
@@ -550,10 +557,18 @@ class IR0GenOpt
 	//
 	static CodePack genROP(Ast0.Binop n) throws Exception
 	{
-		System.out.println("RELATION");
-		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
 		CodePack l = gen(n.e1);
 		CodePack r = gen(n.e2);
+		
+		if (isStaticRelation(n.op, l.src, r.src))
+		{
+			Src src = getStaticRelation(n.op, l.src, r.src);
+			
+			return new CodePack(src);
+		}
+		
+		List<IR0.Inst> code = new ArrayList<IR0.Inst>();
+		
 		IR0.Temp t = new IR0.Temp();
 		IR0.Label L = new IR0.Label();
 		code.addAll(l.code);
@@ -562,7 +577,84 @@ class IR0GenOpt
 		code.add(new IR0.CJump((IR0.ROP) gen(n.op), l.src, r.src, L));
 		code.add(new IR0.Move(t, IR0.FALSE));
 		code.add(new IR0.LabelDec(L));
+		
 		return new CodePack(t, code);
+	}
+	
+	static boolean isStaticRelation(Ast0.BOP op, Src l, Src r)
+	{
+		return (l instanceof IR0.IntLit && r instanceof IR0.IntLit) || (l instanceof IR0.BoolLit && r instanceof IR0.BoolLit);
+	}
+	
+	static Src getStaticRelation(Ast0.BOP op, Src l, Src r)
+	{
+		if (l instanceof IR0.IntLit && r instanceof IR0.IntLit)
+		{
+			return getStaticRelationIntLit(op.toString(), ((IR0.IntLit) l).i, ((IR0.IntLit) r).i);
+		}
+		else
+		{
+			return getStaticRelationBoolLit(op.toString(), ((IR0.BoolLit) l).b, ((IR0.BoolLit) r).b);
+		}
+	}
+	
+	static Src getStaticRelationIntLit(String op, int lhs, int rhs)
+	{
+//		/EQ("=="), NE("!="), LT("<"), LE("<="), GT(">"), GE(">=")
+		
+		boolean result;
+		switch (op)
+		{
+			case "==":
+				result = lhs == rhs;
+				break;
+			
+			case "!=":
+				result = lhs != rhs;
+				break;
+			
+			case "<":
+				result = lhs < rhs;
+				break;
+			
+			case "<=":
+				result = lhs <= rhs;
+				break;
+				
+			case ">":
+				result = lhs > rhs;
+				break;
+				
+			case ">=":
+				result = lhs >= rhs;
+				break;
+				
+			default:
+				throw new IllegalArgumentException("Unhandled getStaticRelationIntLit operator: " + op);
+		}
+		
+		return new IR0.BoolLit(result);
+	}
+	
+	static Src getStaticRelationBoolLit(String op, boolean lhs, boolean rhs)
+	{
+		
+		boolean result;
+		switch (op)
+		{
+			case "==":
+				result = lhs == rhs;
+				break;
+			
+			case "!=":
+				result = lhs != rhs;
+				break;
+				
+			default:
+				throw new IllegalArgumentException("Unhandled getStaticRelationBoolLit operator: " + op);
+		}
+		
+		return new IR0.BoolLit(result);
 	}
 	
 	// Ast0.Unop ---
