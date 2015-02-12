@@ -8,8 +8,11 @@
 
 import java.util.*;
 import java.io.*;
+
 import ast.*;
 import ir.*;
+import ir.IR.Addr;
+import ir.IR.Temp;
 
 public class IRGen
 {
@@ -624,11 +627,26 @@ public class IRGen
 	// 4. Store a pointer to the class's descriptor into the first slot of
 	// the allocated space
 	//
-	static CodePack gen(Ast.NewObj n, ClassInfo cinfo, Env env)
-			throws Exception
+	static CodePack gen(Ast.NewObj n, ClassInfo cinfo, Env env) throws Exception
 	{
+		List<IR.Inst> code = new ArrayList<>();
 		
-		// ... need code
+		ClassInfo newClassInfo = classEnv.get(n.nm);
+		
+		Ast.Type newClassType = new Ast.ObjType(n.nm);
+		int newClassSize = newClassInfo.objSize;
+		
+		// Invoke malloc.
+		IR.Global mallocGlobal = new IR.Global("malloc");
+		IR.Temp temp = new IR.Temp();
+		IR.Call malloc = new IR.Call(mallocGlobal, false, new IR.Src[] { new IR.IntLit(newClassSize) }, temp);
+		code.add(malloc);
+		
+		// TODO I know temp should not be the last thing... it should store the class's descriptor.
+		IR.Store store = new IR.Store(gen(newClassType), new IR.Addr(temp, 0), temp);
+		code.add(store);
+		
+		return new CodePack(gen(newClassType), temp, code);
 		
 	}
 	
@@ -645,9 +663,13 @@ public class IRGen
 	//
 	static CodePack gen(Ast.Field n, ClassInfo cinfo, Env env) throws Exception
 	{
+		AddrPack addrPack = genAddr(n, cinfo, env);
 		
-		// ... need code
+		IR.Temp temp = new IR.Temp();
+		IR.Load load = new IR.Load(addrPack.type, temp, addrPack.addr);
+		addrPack.code.add(load);
 		
+		return new CodePack(addrPack.type, temp, addrPack.code);
 	}
 	
 	// 2. genAddr()
@@ -658,12 +680,19 @@ public class IRGen
 	// 2.3 Access base ClassInfo rec to get field variable's offset
 	// 2.4 Generate an IR.Addr based on the offset
 	//
-	static AddrPack genAddr(Ast.Field n, ClassInfo cinfo, Env env)
-			throws Exception
+	static AddrPack genAddr(Ast.Field n, ClassInfo cinfo, Env env) throws Exception
 	{
+		CodePack objPack = gen(n.obj, cinfo, env);
+		ClassInfo objInfo = getClassInfo(n.obj, cinfo, env);
 		
-		// ... need code
+		Ast.Type fieldType = objInfo.fieldType(n.nm);
+		int fieldOffset = objInfo.fieldOffset(n.nm);
+	
+		// TODO Unsure about this...
+		IR.Src src = expToSrc(n.obj);
+		IR.Addr addr = new Addr(src, fieldOffset);
 		
+		return new AddrPack(gen(fieldType), addr, objPack.code);
 	}
 	
 	// Id ---
@@ -679,9 +708,18 @@ public class IRGen
 	//
 	static CodePack gen(Ast.Id n, ClassInfo cinfo, Env env) throws Exception
 	{
+		// If the variable name exists in the environment, it's local/parameter.
+		if (env.containsKey(n.nm))
+		{
+			IR.Src id = new IR.Id(n.nm);
+			
+			return new CodePack(gen(env.get(n.nm)), id, new ArrayList<>());
+		}
 		
-		// ... need code
+		// Otherwise repackage this as a field, and call gen on it's Field representation.
+		Ast.Field field = new Ast.Field(Ast.This, n.nm);
 		
+		return gen(field, cinfo, env);
 	}
 	
 	// This ---
@@ -732,4 +770,13 @@ public class IRGen
 		throw new GenException("Invalid Ast type: " + n);
 	}
 	
+	static IR.Src expToSrc(Ast.Exp e) throws Exception
+	{
+		if (e instanceof Ast.Id)
+		{
+			return new IR.Id(((Ast.Id) e).nm);
+		}
+		
+		throw new GenException("expToSrc: Unhandled expression type: "+ e.getClass().getName());
+	}
 }
