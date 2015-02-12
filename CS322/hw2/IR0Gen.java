@@ -1,6 +1,8 @@
 // This is supporting software for CS321/CS322 Compilers and Language Design.
 // Copyright (c) Portland State University
 // 
+// Homework 2 submission for Ian Aldrighetti <aldrig@pdx.edu>
+//
 // IR0 code generator. (For CS322)
 //
 //  - short-circuit semantics for Boolean expressions
