@@ -1,0 +1,21 @@
+#!/bin/sh
+for i
+do
+	d=`dirname $i`
+	f=`basename $i .ast`
+	echo -n "$d/$f: "
+	java IRGen $d/$f.ast 1> $d/$f.ir
+	if [ -r $d/$f.ir.ref ]; then
+          diff -w $d/$f.ir $d/$f.ir.ref > $d/$f.ir.diff; 
+          if [ -s $d/$f.ir.diff ]; then 
+            echo "differs from ref (see $f.ir.diff)"; 
+          else
+            echo "matches ref"; 
+	    rm $d/$f.ir.diff; 
+          fi
+	else
+            echo "no ref to compare"; 
+        fi
+done
+exit 0
+
