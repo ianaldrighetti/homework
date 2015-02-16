@@ -10,8 +10,13 @@ import java.util.*;
 import java.io.*;
 
 import ast.*;
+import ast.Ast.Param;
+import ast.Ast.Stmt;
+import ast.Ast.VarDecl;
 import ir.*;
 import ir.IR.Addr;
+import ir.IR.BoolLit;
+import ir.IR.Inst;
 import ir.IR.Temp;
 
 public class IRGen
@@ -367,9 +372,14 @@ public class IRGen
 	//
 	static List<IR.Func> gen(Ast.ClassDecl n, ClassInfo cinfo) throws Exception
 	{
+		List<IR.Func> funcs = new ArrayList<IR.Func>();
+	
+		for (Ast.MethodDecl methodDecl : n.mthds)
+		{
+			funcs.add(gen(methodDecl, cinfo));
+		}
 		
-		// ... need code
-		
+		return funcs;
 	}
 	
 	// MethodDecl ---
@@ -389,9 +399,53 @@ public class IRGen
 	//
 	static IR.Func gen(Ast.MethodDecl n, ClassInfo cinfo) throws Exception
 	{
+		// Create global label.
+		// TODO something with this
+		String globalLabel = cinfo.className() + "_" + n.nm;
 		
-		// ... need code
+		// Add obj to params list.
+		String[] params = new String[n.params.length + 1];
+		params[0] = "obj";
+		for (int i = 0; i < params.length; i++)
+		{
+			params[i + 1] = n.params[i].nm;
+		}
 		
+		// Nothing for main!
+		if (n.nm.equals("main"))
+		{
+			params = new String[0];
+		}
+		
+		String[] locals = new String[n.vars.length];
+		for (int i = 0; i < n.vars.length; i++)
+		{
+			locals[i] = n.vars[0].nm; 
+		}
+		
+		Env environment = new Env();
+		
+		// Add everything to the environment.
+		for (Param param : n.params)
+		{
+			environment.put(param.nm, param.t);
+		}
+		
+		for (VarDecl varDecl : n.vars)
+		{
+			environment.put(varDecl.nm, varDecl.t);
+		}
+		
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
+		
+		for (Stmt stmt : n.stmts)
+		{
+			code.addAll(gen(stmt, cinfo, environment));
+		}
+		
+		IR.Func func = new IR.Func(n.nm, params, locals, (Inst[]) code.toArray());
+		
+		return func;
 	}
 	
 	// VarDecl ---
@@ -403,12 +457,22 @@ public class IRGen
 	// 1. If init exp exists, generate IR code for it and assign result to var
 	// 2. Return generated code (or null if none)
 	//
-	private static List<IR.Inst> gen(Ast.VarDecl n, ClassInfo cinfo, Env env)
-			throws Exception
+	private static List<IR.Inst> gen(Ast.VarDecl n, ClassInfo cinfo, Env env) throws Exception
 	{
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
 		
-		// ... need code
+		if (n.init != null)
+		{
+			//CodePack val = gen(n.init, cinfo, env);
+			
+			Ast.Id dest = new Ast.Id(n.nm);
+			
+			Ast.Assign assign = new Ast.Assign(dest, n.init);
+			
+			code.addAll(gen(assign, cinfo, env));
+		}
 		
+		return code;
 	}
 	
 	// STATEMENTS
@@ -441,9 +505,14 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.Block n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
 		
-		// ... need code
+		for (Stmt stmt : n.stmts)
+		{
+			code.addAll(gen(stmt, cinfo, env));
+		}
 		
+		return code;
 	}
 	
 	// Assign ---
@@ -458,9 +527,33 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.Assign n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
 		
-		// ... need code
+		CodePack lhs = gen(n.lhs, cinfo, env);
+		CodePack rhs = gen(n.rhs, cinfo, env);
 		
+		code.addAll(lhs.code);
+		code.addAll(rhs.code);
+		
+		if (lhs.src instanceof IR.Id)
+		{
+			IR.Id id = (IR.Id) lhs.src;
+			
+			if (!env.containsKey(id.name))
+			{
+				throw new GenException("Assign: ID not found: " + id.name);
+			}
+			
+			code.add(new IR.Move(id, rhs.src));
+		}
+		else
+		{
+			AddrPack addrPack = genAddr(n.lhs, cinfo, env);
+			
+			code.add(new IR.Store(lhs.type, addrPack.addr, rhs.src));
+		}
+		
+		return code;
 	}
 	
 	// CallStmt ---
@@ -515,8 +608,28 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.If n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
+		IR.Label L1 = new IR.Label();
 		
-		// ... need code
+		CodePack p = gen(n.cond, cinfo, env);
+		code.addAll(p.code);
+		code.add(new IR.CJump(IR.ROP.EQ, p.src, new IR.BoolLit(false), L1));
+		code.addAll(gen(n.s1, cinfo, env));
+		
+		if (n.s2 == null)
+		{
+			code.add(new IR.LabelDec(L1));
+		}
+		else
+		{
+			IR.Label L2 = new IR.Label();
+			code.add(new IR.Jump(L2));
+			code.add(new IR.LabelDec(L1));
+			code.addAll(gen(n.s2, cinfo, env));
+			code.add(new IR.LabelDec(L2));
+		}
+		
+		return code;
 		
 	}
 	
@@ -529,9 +642,25 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.While n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		CodePack condPack = gen(n.cond, cinfo, env);
 		
-		// ... need code
+		// Define a loop label (to get back to the start).
+		IR.Label loopLabel = new IR.Label();
 		
+		// An exit loop label.
+		IR.Label exitLabel = new IR.Label();
+		
+		// Then the condition check.
+		condPack.code.add(new IR.LabelDec(loopLabel));
+		condPack.code.add(new IR.CJump(IR.ROP.EQ, condPack.src, new IR.BoolLit(false), exitLabel));
+		
+		// The code within the while.
+		condPack.code.addAll(gen(n.s, cinfo, env));
+		
+		// Then the exit label.
+		condPack.code.add(new IR.LabelDec(exitLabel));
+		
+		return condPack.code;
 	}
 	
 	// Print ---
@@ -548,8 +677,29 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.Print n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		if (n.arg == null || n.arg instanceof Ast.StrLit)
+		{
+			List<IR.Inst> code = new ArrayList<IR.Inst>();
+			
+			IR.CallTgt printStr = new IR.Global("printStr");
+			IR.Src[] strArgs = new IR.Src[0];
+			
+			if (n.arg != null)
+			{
+				strArgs = new IR.Src[1];
+				strArgs[0] = new IR.StrLit(((Ast.StrLit) n.arg).s);
+			}
+			
+			
+			code.add(new IR.Call(printStr, false, strArgs, null));
+			
+			return code;
+		}
 		
-		// ... need code
+		//CodePack arg = gen(n.arg, cinfo, env);
+		// TODO this
+		
+		throw new GenException("Not yet implemented: non-strlit prints");
 		
 	}
 	
@@ -564,9 +714,20 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.Return n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		if (n.val == null)
+		{
+			List<IR.Inst> code = new ArrayList<IR.Inst>();
+			
+			code.add(new IR.Return());
+			
+			return code;
+		}
 		
-		// ... need code
+		CodePack pack = gen(n.val, cinfo, env);
 		
+		pack.code.add(new IR.Return(pack.src));
+		
+		return pack.code;
 	}
 	
 	// EXPRESSIONS
