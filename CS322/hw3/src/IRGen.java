@@ -383,12 +383,16 @@ public class IRGen
 			}
 		}
 		
+		ClassInfo classInfo = classEnv.get(n.nm);
+		//System.out.println(classInfo.parent.);
+		classSize = classInfo.objSize;
+		
 		IR.Global[] methodGlobals = new IR.Global[n.mthds.length];
 		for (int i = 0; i < n.mthds.length; i++)
 		{
 			Ast.MethodDecl methodDecl = n.mthds[i];
 			
-			methodGlobals[i] = new IR.Global(n.nm + "_" + methodDecl.nm); 
+			methodGlobals[i] = new IR.Global((classInfo.parent != null ? classInfo.parent.className() + "_" : "") + methodDecl.nm); 
 		}
 		
 		return new IR.Data(classGlobal, classSize, methodGlobals);
@@ -435,7 +439,7 @@ public class IRGen
 		// Add obj to params list.
 		String[] params = new String[n.params.length + 1];
 		params[0] = "obj";
-		for (int i = 0; i < params.length; i++)
+		for (int i = 0; i < n.params.length; i++)
 		{
 			params[i + 1] = n.params[i].nm;
 		}
@@ -472,7 +476,14 @@ public class IRGen
 			code.addAll(gen(stmt, cinfo, environment));
 		}
 		
-		IR.Func func = new IR.Func(n.nm, params, locals, (Inst[]) code.toArray());
+		if (n.t == null)
+		{
+			code.add(new IR.Return());
+		}
+		
+		IR.Inst[] codeArray = (IR.Inst[]) code.toArray(new IR.Inst[code.size()]);
+		
+		IR.Func func = new IR.Func(n.nm, params, locals, codeArray);
 		
 		return func;
 	}
@@ -508,8 +519,7 @@ public class IRGen
 	
 	// Dispatch a generic call to a specific Stmt routine
 	//
-	static List<IR.Inst> gen(Ast.Stmt n, ClassInfo cinfo, Env env)
-			throws Exception
+	static List<IR.Inst> gen(Ast.Stmt n, ClassInfo cinfo, Env env) throws Exception
 	{
 		if (n instanceof Ast.Block)
 			return gen((Ast.Block) n, cinfo, env);
@@ -759,9 +769,9 @@ public class IRGen
 	// with its value
 	// 2. Otherwise, generate an IR.Return with no value
 	//
-	static List<IR.Inst> gen(Ast.Return n, ClassInfo cinfo, Env env)
-			throws Exception
+	static List<IR.Inst> gen(Ast.Return n, ClassInfo cinfo, Env env) throws Exception
 	{
+		System.out.println("RETURN");
 		if (n.val == null)
 		{
 			List<IR.Inst> code = new ArrayList<IR.Inst>();
