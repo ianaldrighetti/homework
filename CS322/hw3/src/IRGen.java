@@ -6,18 +6,22 @@
 // (Starter version.)
 //
 
-import java.util.*;
-import java.io.*;
+import ir.IR;
+import ir.IR.Addr;
+import ir.IR.Dest;
+import ir.IR.Inst;
 
-import ast.*;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Vector;
+
+import ast.Ast;
 import ast.Ast.Param;
 import ast.Ast.Stmt;
 import ast.Ast.VarDecl;
-import ir.*;
-import ir.IR.Addr;
-import ir.IR.BoolLit;
-import ir.IR.Inst;
-import ir.IR.Temp;
+import ast.astParser;
 
 public class IRGen
 {
@@ -360,9 +364,34 @@ public class IRGen
 	//
 	static IR.Data genData(Ast.ClassDecl n, ClassInfo cinfo) throws Exception
 	{
+		IR.Global classGlobal = new IR.Global("class_" + n.nm);
 		
-		// ... need code
+		int classSize = 8;
+		for (VarDecl varDecl : n.flds)
+		{
+			if (varDecl.t instanceof Ast.IntType)
+			{
+				classSize += 4;
+			}
+			else if (varDecl.t instanceof Ast.BoolType)
+			{
+				classSize += 1;
+			}
+			else
+			{
+				classSize += 8;
+			}
+		}
 		
+		IR.Global[] methodGlobals = new IR.Global[n.mthds.length];
+		for (int i = 0; i < n.mthds.length; i++)
+		{
+			Ast.MethodDecl methodDecl = n.mthds[i];
+			
+			methodGlobals[i] = new IR.Global(n.nm + "_" + methodDecl.nm); 
+		}
+		
+		return new IR.Data(classGlobal, classSize, methodGlobals);
 	}
 	
 	// 2. Generate code
@@ -595,8 +624,27 @@ public class IRGen
 			ClassInfo cinfo, Env env, boolean retFlag) throws Exception
 	{
 		
-		// ... need code
+		CodePack objPack = gen(obj, cinfo, env);
 		
+		ClassInfo objInfo = getClassInfo(obj, cinfo, env);
+		int methodOffset = objInfo.methodOffset(name);
+		
+		String globalLabel = objInfo.className() + "_" + name;
+		
+		Dest dest = (objPack.src instanceof IR.Id) ? (IR.Id) objPack.src : (IR.Temp) objPack.src;  
+		
+		// TODO FIX THIS
+		objPack.code.add(new IR.Load(IR.Type.PTR, dest, new IR.Addr(thisObj, methodOffset)));
+		
+		Ast.Exp[] argsWithObj = new Ast.Exp[args.length + 1];
+		argsWithObj[0] = new Ast.Id(((IR.Id) objPack.src).name);
+		for (int i = 0; i < args.length; i++)
+		{
+			argsWithObj[i + 1] = args[i];
+		}
+		
+		
+		return objPack;
 	}
 	
 	// If ---
