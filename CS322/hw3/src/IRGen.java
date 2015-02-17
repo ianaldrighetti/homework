@@ -612,9 +612,16 @@ public class IRGen
 		{
 			Ast.Id id = (Ast.Id) n.lhs;
 			
+			//System.out.println(cinfo.fieldOffset(id.nm));
+			
 			if (!env.containsKey(id.nm))
 			{
-				throw new GenException("Assign: ID not found: " + id.nm);
+				// It's a field, then.
+				int fieldOffset = cinfo.fieldOffset(id.nm);
+				
+				code.add(new IR.Store(gen(cinfo.fieldType(id.nm)), new IR.Addr(new IR.Id(id.nm), fieldOffset), rhs.src));
+				
+				return code;
 			}
 		
 			code.addAll(rhs.code);
@@ -861,7 +868,7 @@ public class IRGen
 		{
 			IR.Id id = new IR.Id(((Ast.Id) n.arg).nm);
 			
-			IR.CallTgt print = new IR.Global(getPrintFunction(env.get(id.name)));
+			IR.CallTgt print = new IR.Global(getPrintFunction(env, cinfo, id.name));
 			IR.Src[] printArgs = new IR.Src[1];
 			
 			printArgs[0] = id;
@@ -875,7 +882,7 @@ public class IRGen
 			Ast.Field field = (Ast.Field) n.arg;
 			ClassInfo objInfo = getClassInfo(field.obj, cinfo, env);
 			
-			IR.CallTgt print = new IR.Global(getPrintFunction(objInfo.fieldType(field.nm)));
+			IR.CallTgt print = new IR.Global(getPrintFunction(env, objInfo, field.nm));
 			IR.Src[] printArgs = new IR.Src[1];
 			
 			CodePack fieldPack = gen(field, cinfo, env);
@@ -893,8 +900,9 @@ public class IRGen
 		throw new GenException("Ast.Print: Unknown type: " + n.arg.getClass().getCanonicalName() + ".");
 	}
 	
-	private static String getPrintFunction(Ast.Type type) throws Exception
+	private static String getPrintFunction(Env env, ClassInfo cinfo, String name) throws Exception
 	{
+		Ast.Type type = env.get(name) != null ? env.get(name) : cinfo.fieldType(name);
 		if (type instanceof Ast.BoolType)
 		{
 			return "printBool";
@@ -903,6 +911,11 @@ public class IRGen
 		{
 			return "printInt";
 		}
+		else if (type == null)
+		{
+			throw new GenException("GetPrintFunction: Type is null.");
+		}
+		
 		
 		throw new GenException("GetPrintFunction: Unknown type: " + type.getClass().getCanonicalName() + ".");
 	}
