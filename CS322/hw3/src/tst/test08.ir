@@ -1,8 +1,7 @@
-0
 # IR Program
 
 data _class_Test (sz=8): _main
-data _class_Body (sz=8): _go
+data _class_Body (sz=8): _Body_go
 
 _main ()
 (b)
@@ -12,10 +11,11 @@ _main ()
  b = t1
  t2 = [b]:P
  t3 = [t2]:P
+ call * t3(b)
  return 
 }
 
-_go (obj)
+_Body_go (obj)
 {
  call _printStr("Go!")
  return 
