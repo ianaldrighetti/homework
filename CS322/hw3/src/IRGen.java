@@ -8,8 +8,10 @@
 
 import ir.IR;
 import ir.IR.Addr;
+import ir.IR.BoolLit;
 import ir.IR.Dest;
 import ir.IR.Inst;
+import ir.IR.StrLit;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -732,33 +734,55 @@ public class IRGen
 	// to decide which of the two functions, "printInt" and "printBool",
 	// to call
 	//
-	static List<IR.Inst> gen(Ast.Print n, ClassInfo cinfo, Env env)
-			throws Exception
+	static List<IR.Inst> gen(Ast.Print n, ClassInfo cinfo, Env env) throws Exception
 	{
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
+		
 		if (n.arg == null || n.arg instanceof Ast.StrLit)
 		{
-			List<IR.Inst> code = new ArrayList<IR.Inst>();
-			
 			IR.CallTgt printStr = new IR.Global("printStr");
-			IR.Src[] strArgs = new IR.Src[0];
+			IR.Src[] strArgs = new IR.Src[1];
 			
 			if (n.arg != null)
 			{
-				strArgs = new IR.Src[1];
 				strArgs[0] = new IR.StrLit(((Ast.StrLit) n.arg).s);
 			}
-			
+			else
+			{
+				strArgs[0] = new IR.StrLit("");
+			}
 			
 			code.add(new IR.Call(printStr, false, strArgs, null));
+			
+			return code;
+		}
+		else if (n.arg instanceof Ast.BoolLit)
+		{
+			IR.CallTgt printBool = new IR.Global("printBool");
+			IR.Src[] boolArgs = new IR.Src[1];
+			
+			boolArgs[0] = new IR.BoolLit(((Ast.BoolLit) n.arg).b);
+			
+			code.add(new IR.Call(printBool, false, boolArgs, null));
+			
+			return code;
+		}
+		else if (n.arg instanceof Ast.IntLit)
+		{
+			IR.CallTgt printInt = new IR.Global("printInt");
+			IR.Src[] intArgs = new IR.Src[1];
+			
+			intArgs[0] = new IR.IntLit(((Ast.IntLit) n.arg).i);
+			
+			code.add(new IR.Call(printInt, false, intArgs, null));
 			
 			return code;
 		}
 		
 		//CodePack arg = gen(n.arg, cinfo, env);
 		// TODO this
-		
+		System.out.println("TYPE: " + n.arg.getClass().getCanonicalName());
 		throw new GenException("Not yet implemented: non-strlit prints");
-		
 	}
 	
 	// Return ---
