@@ -434,13 +434,13 @@ public class IRGen
 	// Codegen Guideline:
 	// Straightforward -- generate a IR.Func for each mthdDecl.
 	//
-	static List<IR.Func> gen(Ast.ClassDecl n, ClassInfo cinfo) throws Exception
+	static List<IR.Func> gen(Ast.ClassDecl n, ClassInfo cinfo, boolean isFirst) throws Exception
 	{
 		List<IR.Func> funcs = new ArrayList<IR.Func>();
 	
 		for (Ast.MethodDecl methodDecl : n.mthds)
 		{
-			funcs.add(gen(methodDecl, cinfo));
+			funcs.add(gen(methodDecl, cinfo, isFirst));
 		}
 		
 		return funcs;
@@ -710,11 +710,12 @@ public class IRGen
 		IR.Src[] methodArgs = getMethodCallArgs(args, objPack.src);
 		
 		// TODO set dest, if necessary.
-		IR.Dest dest = null;
+		IR.Dest dest = retFlag ? new IR.Temp() : null;
 		
 		// Now generate the call.
 		objPack.code.add(new IR.Call(methodTemp, true, methodArgs, dest));
 		
+		objPack.src = retFlag ? dest : null;
 		
 		return objPack;
 	}
@@ -916,7 +917,6 @@ public class IRGen
 	//
 	static List<IR.Inst> gen(Ast.Return n, ClassInfo cinfo, Env env) throws Exception
 	{
-		System.out.println("RETURN");
 		if (n.val == null)
 		{
 			List<IR.Inst> code = new ArrayList<IR.Inst>();
@@ -1140,6 +1140,10 @@ public class IRGen
 		if (e instanceof Ast.Id)
 		{
 			return new IR.Id(((Ast.Id) e).nm);
+		}
+		else if (e instanceof Ast.IntLit)
+		{
+			return new IR.IntLit(((Ast.IntLit) e).i);
 		}
 		
 		throw new GenException("expToSrc: Unhandled expression type: "+ e.getClass().getName());
