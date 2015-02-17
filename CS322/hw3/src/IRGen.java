@@ -11,6 +11,8 @@ import ir.IR.Addr;
 import ir.IR.BoolLit;
 import ir.IR.Call;
 import ir.IR.Dest;
+import ir.IR.Global;
+import ir.IR.Id;
 import ir.IR.Inst;
 import ir.IR.LabelDec;
 import ir.IR.StrLit;
@@ -598,30 +600,35 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.Assign n, ClassInfo cinfo, Env env)
 			throws Exception
 	{
+		
 		List<IR.Inst> code = new ArrayList<IR.Inst>();
 		
-		CodePack lhs = gen(n.lhs, cinfo, env);
 		CodePack rhs = gen(n.rhs, cinfo, env);
 		
-		//code.addAll(lhs.code);
-		code.addAll(rhs.code);
-		
-		if (lhs.src instanceof IR.Id)
+		if (n.lhs instanceof Ast.Id)
 		{
-			IR.Id id = (IR.Id) lhs.src;
+			Ast.Id id = (Ast.Id) n.lhs;
 			
-			if (!env.containsKey(id.name))
+			if (!env.containsKey(id.nm))
 			{
-				throw new GenException("Assign: ID not found: " + id.name);
+				throw new GenException("Assign: ID not found: " + id.nm);
 			}
+		
+			code.addAll(rhs.code);
 			
-			code.add(new IR.Move(id, rhs.src));
+			code.add(new IR.Move(new IR.Id(id.nm), rhs.src));
 		}
-		else
+		else if (n.lhs instanceof Ast.Field)
 		{
 			AddrPack addrPack = genAddr(n.lhs, cinfo, env);
 			
-			code.add(new IR.Store(lhs.type, addrPack.addr, rhs.src));
+			code.addAll(addrPack.code);
+			
+			code.add(new IR.Store(addrPack.type, addrPack.addr, rhs.src));
+		}
+		else
+		{
+			throw new GenException("Ast.Assign: Unhandled Exp type: " + n.lhs.getClass().getCanonicalName() + ".");
 		}
 		
 		return code;
@@ -962,7 +969,8 @@ public class IRGen
 		code.add(malloc);
 		
 		// TODO I know temp should not be the last thing... it should store the class's descriptor.
-		IR.Store store = new IR.Store(gen(newClassType), new IR.Addr(temp, 0), temp);
+		IR.Global classGlobal = new IR.Global("class_" + n.nm);
+		IR.Store store = new IR.Store(gen(newClassType), new IR.Addr(temp, 0), classGlobal);
 		code.add(store);
 		
 		return new CodePack(gen(newClassType), temp, code);

@@ -1,12 +1,2 @@
 4d3
 < data _class_A (sz=12): 
-10c9
-<  [t1]:P = t1
----
->  [t1]:P = _class_A
-13,14c12,13
-<  t3 = 8[a]:I
-<  call _printInt(t3)
----
->  t2 = 8[a]:I
->  call _printInt(t2)

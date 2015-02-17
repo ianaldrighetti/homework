@@ -1,0 +1,14 @@
+4c4
+< data _class_Body (sz=8): _go
+---
+> data _class_Body (sz=8): _Body_go
+12c12,14
+<  b = -8[obj]:P
+---
+>  t2 = [b]:P
+>  t3 = [t2]:P
+>  call * t3(b)
+16c18
+< _go (obj)
+---
+> _Body_go (obj)

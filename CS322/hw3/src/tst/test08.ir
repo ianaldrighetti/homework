@@ -1,0 +1,20 @@
+# IR Program
+
+data _class_Test (sz=8): _main
+data _class_Body (sz=8): _go
+
+_main ()
+(b)
+{
+ t1 = call _malloc(8)
+ [t1]:P = _class_Body
+ b = t1
+ b = -8[obj]:P
+ return 
+}
+
+_go (obj)
+{
+ call _printStr("Go!")
+ return 
+}
