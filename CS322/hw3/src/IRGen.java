@@ -297,7 +297,7 @@ public class IRGen
 		
 		for (MethodDecl methodDecl : n.mthds)
 		{
-			if (!cinfo.vtable.contains(methodDecl.nm))
+			if (cinfo.vtable.contains(methodDecl.nm))
 			{
 				continue;
 			}
@@ -675,7 +675,7 @@ public class IRGen
 		
 		CodePack objPack = gen(obj, cinfo, env);
 		
-		ClassInfo objInfo = getClassInfo(obj, cinfo, env);
+		/*ClassInfo objInfo = getClassInfo(obj, cinfo, env);
 		int methodOffset = objInfo.methodOffset(name);
 		
 		String globalLabel = objInfo.className() + "_" + name;
@@ -690,10 +690,35 @@ public class IRGen
 		for (int i = 0; i < args.length; i++)
 		{
 			argsWithObj[i + 1] = args[i];
-		}
+		}*/
+		
+		// Make a temp get the object's base location.
+		IR.Temp objTemp = new IR.Temp();
+		objPack.code.add(new IR.Load(IR.Type.PTR, objTemp, new IR.Addr(objPack.src, 0)));
+		
+		ClassInfo objInfo = getClassInfo(obj, cinfo, env);
+		int methodOffset = objInfo.methodOffset(name);
+		
+		// Now the method location.
+		IR.Temp methodTemp = new IR.Temp();
+		objPack.code.add(new IR.Load(IR.Type.PTR, methodTemp, new IR.Addr(objTemp, methodOffset)));
+		
+		// Get the arguments.
+		IR.Src[] methodArgs = getMethodCallArgs(args);
+		
+		// TODO set dest, if necessary.
+		IR.Dest dest = null;
+		
+		// Now generate the call.
+		objPack.code.add(new IR.Call(methodTemp, true, methodArgs, dest));
 		
 		
 		return objPack;
+	}
+	
+	private static IR.Src[] getMethodCallArgs(Ast.Exp[] args)
+	{
+	
 	}
 	
 	// If ---

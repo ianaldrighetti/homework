@@ -1,3 +1,4 @@
+0
 # IR Program
 
 data _class_Test (sz=8): _main
@@ -9,7 +10,8 @@ _main ()
  t1 = call _malloc(8)
  [t1]:P = _class_Body
  b = t1
- b = -8[obj]:P
+ t2 = [b]:P
+ t3 = [t2]:P
  return 
 }
 

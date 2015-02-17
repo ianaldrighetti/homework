@@ -11,7 +11,7 @@ import java.io.*;
 import ast.*;
 import ir.*;
 
-public class IRGen {
+public class IRGen0 {
 
   static class GenException extends Exception {
     public GenException(String msg) { super(msg); }
