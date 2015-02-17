@@ -9,6 +9,7 @@
 import ir.IR;
 import ir.IR.Addr;
 import ir.IR.BoolLit;
+import ir.IR.Call;
 import ir.IR.Dest;
 import ir.IR.Inst;
 import ir.IR.StrLit;
@@ -455,7 +456,7 @@ public class IRGen
 		String[] locals = new String[n.vars.length];
 		for (int i = 0; i < n.vars.length; i++)
 		{
-			locals[i] = n.vars[0].nm; 
+			locals[i] = n.vars[i].nm; 
 		}
 		
 		Env environment = new Env();
@@ -466,13 +467,19 @@ public class IRGen
 			environment.put(param.nm, param.t);
 		}
 		
+		// Start gathering the method body.
+		List<IR.Inst> code = new ArrayList<IR.Inst>();
+		
+		// Variable declarations.
 		for (VarDecl varDecl : n.vars)
 		{
 			environment.put(varDecl.nm, varDecl.t);
+			
+			// Might have initialization.
+			code.addAll(gen(varDecl, cinfo, environment));
 		}
 		
-		List<IR.Inst> code = new ArrayList<IR.Inst>();
-		
+		// Then all the statements.
 		for (Stmt stmt : n.stmts)
 		{
 			code.addAll(gen(stmt, cinfo, environment));
@@ -778,11 +785,35 @@ public class IRGen
 			
 			return code;
 		}
+		else if (n.arg instanceof Ast.Id)
+		{
+			IR.Id id = new IR.Id(((Ast.Id) n.arg).nm);
+			
+			IR.CallTgt print = new IR.Global(getPrintFunction(env.get(id.name)));
+			IR.Src[] printArgs = new IR.Src[1];
+			
+			printArgs[0] = id;
+			
+			code.add(new IR.Call(print, false, printArgs, null));
+			
+			return code;
+		}
 		
-		//CodePack arg = gen(n.arg, cinfo, env);
-		// TODO this
-		System.out.println("TYPE: " + n.arg.getClass().getCanonicalName());
-		throw new GenException("Not yet implemented: non-strlit prints");
+		throw new GenException("Ast.Print: Unknown type: " + n.arg.getClass().getCanonicalName() + ".");
+	}
+	
+	private static String getPrintFunction(Ast.Type type) throws Exception
+	{
+		if (type instanceof Ast.BoolType)
+		{
+			return "printBool";
+		}
+		else if (type instanceof Ast.IntType || type instanceof Ast.ArrayType || type instanceof Ast.ObjType)
+		{
+			return "printInt";
+		}
+		
+		throw new GenException("GetPrintFunction: Unknown type: " + type.getClass().getCanonicalName() + ".");
 	}
 	
 	// Return ---
