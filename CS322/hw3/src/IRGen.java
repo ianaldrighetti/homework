@@ -12,15 +12,19 @@ import ir.IR.BoolLit;
 import ir.IR.Call;
 import ir.IR.Dest;
 import ir.IR.Inst;
+import ir.IR.LabelDec;
 import ir.IR.StrLit;
+import ir.IR.Temp;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
 
 import ast.Ast;
+import ast.Ast.MethodDecl;
 import ast.Ast.Param;
 import ast.Ast.Stmt;
 import ast.Ast.VarDecl;
@@ -289,7 +293,26 @@ public class IRGen
 		ClassInfo cinfo = (n.pnm != null) ? new ClassInfo(n,
 				classEnv.get(n.pnm)) : new ClassInfo(n);
 		
-		// ... need code
+		for (MethodDecl methodDecl : n.mthds)
+		{
+			if (!cinfo.vtable.contains(methodDecl.nm))
+			{
+				continue;
+			}
+			
+			cinfo.vtable.add(methodDecl.nm);
+		}
+		
+		int offset = cinfo.objSize;
+		for (VarDecl varDecl : n.flds)
+		{
+			cinfo.fdecls.add(varDecl);
+			cinfo.offsets.add(offset);
+			
+			offset += (varDecl.t instanceof Ast.BoolType ? 1 : (varDecl.t instanceof Ast.IntType ? 4 : 8));
+		}
+		
+		cinfo.objSize = offset;
 		
 		return cinfo;
 	}
@@ -580,7 +603,7 @@ public class IRGen
 		CodePack lhs = gen(n.lhs, cinfo, env);
 		CodePack rhs = gen(n.rhs, cinfo, env);
 		
-		code.addAll(lhs.code);
+		//code.addAll(lhs.code);
 		code.addAll(rhs.code);
 		
 		if (lhs.src instanceof IR.Id)
@@ -724,6 +747,9 @@ public class IRGen
 		// The code within the while.
 		condPack.code.addAll(gen(n.s, cinfo, env));
 		
+		// Go back to the start.
+		condPack.code.add(new IR.Jump(loopLabel));
+		
 		// Then the exit label.
 		condPack.code.add(new IR.LabelDec(exitLabel));
 		
@@ -793,6 +819,25 @@ public class IRGen
 			IR.Src[] printArgs = new IR.Src[1];
 			
 			printArgs[0] = id;
+			
+			code.add(new IR.Call(print, false, printArgs, null));
+			
+			return code;
+		}
+		else if (n.arg instanceof Ast.Field)
+		{
+			Ast.Field field = (Ast.Field) n.arg;
+			ClassInfo objInfo = getClassInfo(field.obj, cinfo, env);
+			
+			IR.CallTgt print = new IR.Global(getPrintFunction(objInfo.fieldType(field.nm)));
+			IR.Src[] printArgs = new IR.Src[1];
+			
+			CodePack fieldPack = gen(field, cinfo, env);
+			code.addAll(fieldPack.code);
+			
+			printArgs[0] = fieldPack.src;
+			
+			// TODO CALL GENADDR and ASSIGN temp = offset[class]
 			
 			code.add(new IR.Call(print, false, printArgs, null));
 			
