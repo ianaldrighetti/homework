@@ -605,7 +605,7 @@ public class IRGen
 		List<IR.Inst> code = new ArrayList<IR.Inst>();
 		
 		CodePack rhs = gen(n.rhs, cinfo, env);
-		
+		code.addAll(rhs.code);
 		if (n.lhs instanceof Ast.Id)
 		{
 			Ast.Id id = (Ast.Id) n.lhs;
@@ -622,7 +622,7 @@ public class IRGen
 				return code;
 			}
 		
-			code.addAll(rhs.code);
+			//code.addAll(rhs.code);
 			
 			code.add(new IR.Move(new IR.Id(id.nm), rhs.src));
 		}

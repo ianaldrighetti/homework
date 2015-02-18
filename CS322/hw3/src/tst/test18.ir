@@ -20,6 +20,7 @@ _main ()
 _B_setval (obj, u)
 {
  8[obj]:I = u
+ t1 = 8[obj]:I
  12[obj]:I = t1
  return 
 }
