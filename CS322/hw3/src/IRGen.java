@@ -892,9 +892,7 @@ public class IRGen
 			IR.CallTgt print = new IR.Global(getPrintFunction(env, objInfo, field.nm));
 			IR.Src[] printArgs = new IR.Src[1];
 			
-			// TODO CALL GENADDR and ASSIGN temp = offset[class]
-			
-			
+			// TODO Make this not such a damn mess.
 			IR.Temp temp = new IR.Temp();
 			
 			code.add(new IR.Load(
@@ -909,8 +907,39 @@ public class IRGen
 			
 			return code;
 		}
+		else if (n.arg instanceof Ast.Call)
+		{
+			CodePack call = gen((Ast.Call) n.arg, cinfo, env);
+			
+			code.addAll(call.code);
+			
+			// TODO print the temporary
+			IR.Src[] printArgs = { call.src };
+			
+			IR.CallTgt print = new IR.Global(getPrintFunction(call.type));
+			
+			code.add(new IR.Call(print, false, printArgs, null));
+			
+			return code;
+		}
 		
 		throw new GenException("Ast.Print: Unknown type: " + n.arg.getClass().getCanonicalName() + ".");
+	}
+	
+	private static String getPrintFunction(IR.Type type) throws Exception
+	{
+		if (type == IR.Type.BOOL)
+		{
+			return "printBool";
+		}
+		else if (type == IR.Type.INT || type == IR.Type.PTR)
+		{
+			return "printInt";
+		}
+		else
+		{
+			throw new GenException("GetPrintFunction(IR.Type): Unknown type: " + type.getClass().getCanonicalName() + ".");
+		}
 	}
 	
 	private static String getPrintFunction(Env env, ClassInfo cinfo, String name) throws Exception
