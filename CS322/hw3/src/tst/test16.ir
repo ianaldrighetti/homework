@@ -2,7 +2,7 @@
 
 data _class_Test (sz=8): _main
 data _class_A (sz=8): _A_echo
-data _class_B (sz=8): _B_go
+data _class_B (sz=16): _A_echo, _B_go
 
 _main ()
 (b)

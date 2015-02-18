@@ -1,4 +1,0 @@
-5c5
-< data _class_B (sz=8): _B_go
----
-> data _class_B (sz=16): _A_echo, _B_go

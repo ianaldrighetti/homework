@@ -2,7 +2,7 @@
 
 data _class_Test (sz=8): _main
 data _class_A (sz=16): _A_f, _A_g
-data _class_B (sz=8): _B_f
+data _class_B (sz=16): _B_f, _A_g
 
 _main ()
 (b, a)

@@ -10,6 +10,7 @@ import ir.IR;
 import ir.IR.Addr;
 import ir.IR.BoolLit;
 import ir.IR.Call;
+import ir.IR.Data;
 import ir.IR.Dest;
 import ir.IR.Global;
 import ir.IR.Id;
@@ -402,18 +403,25 @@ public class IRGen
 		
 		IR.Global classGlobal = new IR.Global("class_" + n.nm);
 		
-		ClassInfo classInfo = classEnv.get(n.nm);
-		
-		IR.Global[] methodGlobals = new IR.Global[n.mthds.length];
-		for (int i = 0; i < n.mthds.length; i++)
-		{
-			Ast.MethodDecl methodDecl = n.mthds[i];
-			
-			// TODO unsure about the isFirst thing.
-			methodGlobals[i] = new IR.Global((!isFirst ? classInfo.className() + "_" : "") + methodDecl.nm); 
-		}
+		List<IR.Global> methodGlobalsList = getMethodGlobalsList(cinfo, isFirst);
+		IR.Global[] methodGlobals = (IR.Global[]) methodGlobalsList.toArray(new IR.Global[methodGlobalsList.size()]);
 		
 		return new IR.Data(classGlobal, 8 * methodGlobals.length, methodGlobals);
+		
+	}
+	
+	// TODO Move this back? or use an array instead.
+	private static List<IR.Global> getMethodGlobalsList(ClassInfo cinfo, boolean isFirst) throws Exception
+	{
+		List<IR.Global> methodGlobalsList = new ArrayList<>();
+		
+		for (int i = 0; i < cinfo.vtable.size(); i++)
+		{
+			String baseClassName = cinfo.methodBaseClass(cinfo.vtable.get(i)).className();
+			methodGlobalsList.add(new IR.Global((!isFirst ? baseClassName + "_" : "") + cinfo.vtable.get(i)));
+		}
+		
+		return methodGlobalsList;
 	}
 	
 	// 2. Generate code

@@ -1,6 +1,0 @@
-21,22c21,22
-<  t4 = 8[obj]:I
-<  call _printInt(t4)
----
->  t1 = 8[obj]:I
->  call _printInt(t1)

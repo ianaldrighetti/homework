@@ -1,4 +1,0 @@
-5c5
-< data _class_B (sz=8): _B_f
----
-> data _class_B (sz=16): _B_f, _A_g
