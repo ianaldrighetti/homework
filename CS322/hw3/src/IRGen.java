@@ -314,6 +314,7 @@ public class IRGen
 			offset += (varDecl.t instanceof Ast.BoolType ? 1 : (varDecl.t instanceof Ast.IntType ? 4 : 8));
 		}
 		
+		// TODO this?
 		cinfo.objSize = offset;
 		
 		return cinfo;
@@ -488,6 +489,7 @@ public class IRGen
 		}
 		
 		Env environment = new Env();
+		environment.put("obj", new Ast.ObjType(cinfo.className()));
 		
 		// Add everything to the environment.
 		for (Param param : n.params)
@@ -619,7 +621,7 @@ public class IRGen
 				// It's a field, then.
 				int fieldOffset = cinfo.fieldOffset(id.nm);
 				
-				code.add(new IR.Store(gen(cinfo.fieldType(id.nm)), new IR.Addr(new IR.Id(id.nm), fieldOffset), rhs.src));
+				code.add(new IR.Store(gen(cinfo.fieldType(id.nm)), new IR.Addr(new IR.Id("obj"), fieldOffset), rhs.src));
 				
 				return code;
 			}
@@ -823,7 +825,7 @@ public class IRGen
 	static List<IR.Inst> gen(Ast.Print n, ClassInfo cinfo, Env env) throws Exception
 	{
 		List<IR.Inst> code = new ArrayList<IR.Inst>();
-		
+
 		if (n.arg == null || n.arg instanceof Ast.StrLit)
 		{
 			IR.CallTgt printStr = new IR.Global("printStr");
@@ -868,6 +870,11 @@ public class IRGen
 		{
 			IR.Id id = new IR.Id(((Ast.Id) n.arg).nm);
 			
+			if (!env.containsKey(id.name))
+			{
+				return gen(new Ast.Print(new Ast.Field(Ast.This, id.name)), cinfo, env);
+			}
+			
 			IR.CallTgt print = new IR.Global(getPrintFunction(env, cinfo, id.name));
 			IR.Src[] printArgs = new IR.Src[1];
 			
@@ -885,12 +892,18 @@ public class IRGen
 			IR.CallTgt print = new IR.Global(getPrintFunction(env, objInfo, field.nm));
 			IR.Src[] printArgs = new IR.Src[1];
 			
-			CodePack fieldPack = gen(field, cinfo, env);
-			code.addAll(fieldPack.code);
-			
-			printArgs[0] = fieldPack.src;
-			
 			// TODO CALL GENADDR and ASSIGN temp = offset[class]
+			
+			
+			IR.Temp temp = new IR.Temp();
+			
+			code.add(new IR.Load(
+					gen(objInfo.fieldType(field.nm)),
+					temp,
+					new IR.Addr(expToSrc(field.obj),
+					objInfo.fieldOffset(field.nm))));
+			
+			printArgs[0] = temp;
 			
 			code.add(new IR.Call(print, false, printArgs, null));
 			
@@ -1157,6 +1170,10 @@ public class IRGen
 		else if (e instanceof Ast.IntLit)
 		{
 			return new IR.IntLit(((Ast.IntLit) e).i);
+		}
+		else if (e instanceof Ast.This)
+		{
+			return new IR.Id("obj");
 		}
 		
 		throw new GenException("expToSrc: Unhandled expression type: "+ e.getClass().getName());

@@ -17,7 +17,8 @@ _main ()
 
 _Body_go (obj)
 {
- 8[i]:I = 10
- call _printInt(i)
+ 8[obj]:I = 10
+ t4 = 8[obj]:I
+ call _printInt(t4)
  return 
 }
