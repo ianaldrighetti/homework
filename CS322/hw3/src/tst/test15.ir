@@ -1,8 +1,7 @@
 # IR Program
 
 data _class_Test (sz=8): _main
-data _class_A (sz=12): 
-data _class_B (sz=16): _B_setval
+data _class_B (sz=8): _B_setval
 
 _main ()
 (b)
@@ -22,7 +21,7 @@ _main ()
 
 _B_setval (obj, u, v)
 {
- 8[i]:I = u
- 12[j]:I = v
+ 8[obj]:I = u
+ 12[obj]:I = v
  return 
 }

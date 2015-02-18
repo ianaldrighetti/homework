@@ -1,8 +1,7 @@
 # IR Program
 
 data _class_Test (sz=8): _main
-data _class_A (sz=13): 
-data _class_B (sz=13): _B_go
+data _class_B (sz=8): _B_go
 
 _main ()
 (b)
@@ -23,6 +22,7 @@ L0:
 
 _B_go (obj)
 {
- call _printInt(i)
+ t1 = 8[obj]:I
+ call _printInt(t1)
  return 
 }

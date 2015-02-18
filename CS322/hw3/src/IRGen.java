@@ -395,28 +395,14 @@ public class IRGen
 	//
 	static IR.Data genData(Ast.ClassDecl n, ClassInfo cinfo, boolean isFirst) throws Exception
 	{
-		IR.Global classGlobal = new IR.Global("class_" + n.nm);
-		
-		int classSize = 8;
-		for (VarDecl varDecl : n.flds)
+		if (n.mthds.length == 0)
 		{
-			if (varDecl.t instanceof Ast.IntType)
-			{
-				classSize += 4;
-			}
-			else if (varDecl.t instanceof Ast.BoolType)
-			{
-				classSize += 1;
-			}
-			else
-			{
-				classSize += 8;
-			}
+			return null;
 		}
 		
+		IR.Global classGlobal = new IR.Global("class_" + n.nm);
+		
 		ClassInfo classInfo = classEnv.get(n.nm);
-
-		classSize = classInfo.objSize;
 		
 		IR.Global[] methodGlobals = new IR.Global[n.mthds.length];
 		for (int i = 0; i < n.mthds.length; i++)
@@ -427,7 +413,7 @@ public class IRGen
 			methodGlobals[i] = new IR.Global((!isFirst ? classInfo.className() + "_" : "") + methodDecl.nm); 
 		}
 		
-		return new IR.Data(classGlobal, classSize, methodGlobals);
+		return new IR.Data(classGlobal, 8 * methodGlobals.length, methodGlobals);
 	}
 	
 	// 2. Generate code
@@ -464,6 +450,8 @@ public class IRGen
 	//
 	static IR.Func gen(Ast.MethodDecl n, ClassInfo cinfo, boolean isFirst) throws Exception
 	{
+		IR.Temp.reset();
+		
 		// Create global label.
 		// TODO something with this
 		String globalLabel = cinfo.className() + "_" + n.nm;

@@ -1,7 +1,3 @@
-4c4
-< data _class_Body (sz=12): _Body_go
----
-> data _class_Body (sz=8): _Body_go
 21,22c21,22
 <  t4 = 8[obj]:I
 <  call _printInt(t4)

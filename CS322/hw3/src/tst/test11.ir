@@ -1,7 +1,7 @@
 # IR Program
 
 data _class_Test (sz=8): _main
-data _class_Body (sz=12): _Body_go
+data _class_Body (sz=8): _Body_go
 
 _main ()
 (b)
@@ -18,7 +18,7 @@ _main ()
 _Body_go (obj)
 {
  8[obj]:I = 10
- t4 = 8[obj]:I
- call _printInt(t4)
+ t1 = 8[obj]:I
+ call _printInt(t1)
  return 
 }

@@ -1,7 +1,7 @@
 # IR Program
 
 data _class_Test (sz=8): _main
-data _class_Body (sz=8): _Body_echo, _Body_go
+data _class_Body (sz=16): _Body_echo, _Body_go
 
 _main ()
 (b)
@@ -23,8 +23,8 @@ _Body_echo (obj, i)
 
 _Body_go (obj)
 {
- t5 = [obj]:P
- t6 = [t5]:P
- t7 = call * t6(obj, 10)
- return t7
+ t1 = [obj]:P
+ t2 = [t1]:P
+ t3 = call * t2(obj, 10)
+ return t3
 }
