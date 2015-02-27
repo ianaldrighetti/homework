@@ -3,7 +3,7 @@
 // 
 // IR code generator for miniJava's AST.
 //
-// (Starter version.)
+// Homework assignment completed by Ian Aldrighetti <aldrig@pdx.edu>
 //
 
 import ir.IR;
