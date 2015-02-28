@@ -3,21 +3,27 @@
 // 
 // X86-64 code generator for IR1 (A starter version, For CS322 HW4)
 //
+// Homework 4 completed by Ian Aldrighetti <aldrig@pdx.edu>
+//
 
 import java.io.*;
 import java.util.*;
+
 import ir1.*;
 
 class CodeGen
 {
 	static class GenException extends Exception
 	{
+		private static final long serialVersionUID = 1L;
+
 		public GenException(String msg)
 		{
 			super(msg);
 		}
 	}
 	
+	@SuppressWarnings ("static-access")
 	public static void main(String[] args) throws Exception
 	{
 		if (args.length == 1)
@@ -112,7 +118,7 @@ class CodeGen
 			System.out.print("\t\t\t  # " + me.getKey() + "\t" + me.getValue()
 					+ "\n");
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -182,7 +188,7 @@ class CodeGen
 	static void gen(IR1.Binop n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -212,7 +218,7 @@ class CodeGen
 	static void gen(IR1.Move n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -229,7 +235,7 @@ class CodeGen
 	static void gen(IR1.Load n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -247,7 +253,7 @@ class CodeGen
 	static void gen(IR1.Store n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -278,7 +284,7 @@ class CodeGen
 	static void gen(IR1.CJump n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -292,7 +298,7 @@ class CodeGen
 	static void gen(IR1.Jump n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -331,7 +337,7 @@ class CodeGen
 	static void gen(IR1.Return n) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
@@ -358,7 +364,7 @@ class CodeGen
 	static X86.Reg gen_source(IR1.Src n, final X86.Reg temp) throws Exception
 	{
 		
-		// ... need code ...
+		// TODO need code
 		
 	}
 	
