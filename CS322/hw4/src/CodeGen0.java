@@ -8,7 +8,7 @@ import java.io.*;
 import java.util.*;
 import ir1.*;
 
-class CodeGen {
+class CodeGen0 {
   static class GenException extends Exception {
     public GenException(String msg) { super(msg); }
   }
