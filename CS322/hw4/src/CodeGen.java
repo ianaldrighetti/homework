@@ -9,6 +9,8 @@
 import java.io.*;
 import java.util.*;
 
+import com.sun.nio.sctp.PeerAddressChangeNotification.AddressChangeEvent;
+
 import ir1.*;
 
 class CodeGen
@@ -115,10 +117,43 @@ class CodeGen
 		// call reg-alloc routine to assign registers to all Ids and Temps
 		regMap = RegAlloc.linearScan(n);
 		for (Map.Entry<IR1.Dest, X86.Reg> me : regMap.entrySet())
-			System.out.print("\t\t\t  # " + me.getKey() + "\t" + me.getValue()
-					+ "\n");
+		{
+			System.out.print("\t\t\t  # " + me.getKey() + "\t" + me.getValue() + "\n");
+		}
 		
-		// TODO need code
+		// TODO things
+		
+		System.out.println("\t.p2align 4,0x90");
+		System.out.println("\t.globl _" + fnName);
+		
+		X86.emitGLabel(new X86.GLabel("_" + fnName));
+		
+		// Callee-save
+		//%rbx,%rbp,%r12,%r13,%r14,%r15
+		int calleeSaveSize = 0;
+		for (String local : n.locals)
+		{
+			IR1.Dest p = new IR1.Id(local);
+			X86.Reg reg = regMap.get(p);
+
+			if (getCalleeSaveRegisters().contains(reg))
+			{
+				X86.emit1("pushq", reg);
+				calleeSaveSize += 8;
+			}
+		}
+		
+		if ((calleeSaveSize % 16) == 0)
+		{
+			frameSize += 8;
+		}
+		
+		X86.emit2(getX86Op(IR1.AOP.SUB), new X86.Imm(frameSize), X86.RSP);
+		
+		for (IR1.Inst inst : n.code)
+		{
+			gen(inst);
+		}
 		
 	}
 	
@@ -187,9 +222,76 @@ class CodeGen
 	//
 	static void gen(IR1.Binop n) throws Exception
 	{
+		System.out.println("#" + n);
 		
-		// TODO need code
+		X86.Reg lhs = gen_source(n.src1, tempReg1);
+		X86.Reg rhs = gen_source(n.src2, tempReg2);
 		
+		if (isA(n.op, IR1.AOP.ADD, IR1.AOP.SUB, IR1.AOP.MUL, IR1.AOP.ADD, IR1.AOP.OR))
+		{
+			X86.Reg dest = regMap.get(n.dst);
+			
+			// If the rhs is within the destination, move it out.
+			if (rhs.equals(dest))
+			{
+				X86.emitMov(rhs.s, rhs, tempReg2);
+				
+				rhs = tempReg2;
+			}
+			
+			X86.emitMov(lhs.s, rhs, dest);
+			
+			String op = getX86Op(n.op);
+			X86.emit2(op, rhs, dest);
+		}
+		else if (isA(n.op, IR1.AOP.DIV))
+		{
+			if (rhs.equals(X86.RAX) || rhs.equals(X86.RDX))
+			{
+				X86.emitMov(rhs.s, rhs, tempReg2);
+				
+				rhs = tempReg2;
+			}
+			
+			X86.emit("cqto");
+			X86.emit("idivq");
+			
+			X86.Reg dest = regMap.get(n.dst);
+			X86.emitMov(dest.s, X86.RAX, dest);
+		}
+		
+		throw new GenException("gen(IR1.Binop): Unhandled case of binary operator: " + n.op.getClass().getCanonicalName());
+	}
+	
+	static String getX86Op(IR1.BOP op) throws Exception
+	{
+		if (isA(op, IR1.AOP.ADD))
+		{
+			return "addq";
+		}
+		else if (isA(op, IR1.AOP.SUB))
+		{
+			return "subq";
+		}
+		else if (isA(op, IR1.AOP.MUL))
+		{
+			return "imulq";
+		}
+		
+		throw new GenException("getX86Op(IR1.BO): Unknown binary operator.");
+	}
+	
+	static boolean isA(IR1.BOP actualOp, IR1.BOP... ops)
+	{
+		for (IR1.BOP expectedOp : ops)
+		{
+			if (actualOp == expectedOp)
+			{
+				return true;
+			}
+		}
+		
+		return false;
 	}
 	
 	// Unop ---
@@ -217,9 +319,11 @@ class CodeGen
 	//
 	static void gen(IR1.Move n) throws Exception
 	{
+		X86.Reg dest = regMap.get(n.dst) != null ? regMap.get(n.dst) : tempReg1;
+		X86.Reg from = gen_source(n.src, dest);
 		
-		// TODO need code
 		
+		//X86.emitMov(dest.s, from, dest);
 	}
 	
 	// Load ---
@@ -234,9 +338,10 @@ class CodeGen
 	//
 	static void gen(IR1.Load n) throws Exception
 	{
+		X86.Operand addr = gen_addr(n.addr, tempReg1);
+		X86.Reg dest = regMap.get(n.dst);
 		
-		// TODO need code
-		
+		X86.emitMov(dest.s, addr, dest);	
 	}
 	
 	// Store ---
@@ -318,11 +423,41 @@ class CodeGen
 	//
 	static void gen(IR1.Call n) throws Exception
 	{
-		X86.Reg dest = regMap.get(n.dst);
+		if (n.args.length > 6)
+		{
+			throw new GenException("gen(IR1.Call): Too many arguments (>6).");
+		}
+		
+		//%rdi, %rsi, %rdx, %rcx, %r8, %r9.
+		X86.Reg[] params = { X86.RDI, X86.RSI, X86.RDX, X86.RCX, X86.R8, X86.R9 };
+		
+		int i = 0;
+		for (IR1.Src arg : n.args)
+		{
+			X86.Reg reg = gen_source(arg, params[i]);
+			
+			// If they're equal, no need to move them again.
+			if (reg.equals(params[i]))
+			{
+				i++;
+				continue;
+			}
+			
+			X86.emitMov(reg.s, reg, params[i++]);
+		}
+		
+		X86.emit1("call", new X86.GLabel("_" + n.name));
+		
+		X86.Reg dest = regMap.get(n.rdst);
+		
 		if (dest == null)
+		{
 			return;
-		X86.Reg src = gen_source(n.src, dest);
-		X86.emitMov(X86.Size.Q, src, dest);
+		}
+		
+		//X86.Reg src = gen_source(n.src, dest);
+		
+		//X86.emitMov(X86.Size.Q, src, dest);
 	}
 	
 	// Return ---
@@ -336,9 +471,29 @@ class CodeGen
 	//
 	static void gen(IR1.Return n) throws Exception
 	{
+		// TODO The rest.
 		
-		// TODO need code
+		X86.emit2("addq", new X86.Imm(frameSize), X86.RSP);
 		
+		List<X86.Reg> regList = getCalleeSaveRegisters();
+		for (int index = regList.size() - 1; index >= 0; index--)
+		{
+			X86.Reg reg = regList.get(index);
+			
+			if (regMap.containsValue(reg))
+			{
+				X86.emit1("popq", reg);
+			}
+		}
+		
+		X86.emit0("ret");
+	}
+	
+	static List<X86.Reg> getCalleeSaveRegisters()
+	{
+		X86.Reg[] calleeSave = { X86.RBX, X86.RBP, X86.R12, X86.R13, X86.R14, X86.R15 };
+
+		return Arrays.asList(calleeSave);
 	}
 	
 	// OPERANDS
@@ -363,9 +518,89 @@ class CodeGen
 	//
 	static X86.Reg gen_source(IR1.Src n, final X86.Reg temp) throws Exception
 	{
+		if (isA(n, Type.Id, Type.Temp))
+		{
+			IR1.Dest dest = (IR1.Dest) n;
+			
+			return regMap.get(dest);
+		}
+		else if (isA(n, Type.Int))
+		{
+			IR1.IntLit lit = (IR1.IntLit) n;
+			
+			X86.emitMov(X86.Size.Q, new X86.Imm(lit.i), temp);
+			
+			return temp;
+		}
+		else if (isA(n, Type.Bool))
+		{
+			IR1.BoolLit lit = (IR1.BoolLit) n;
+			
+			X86.emitMov(X86.Size.Q, new X86.Imm(lit.b ? 1 : 0), temp);
+			
+			return temp;
+		}
+		else if (isA(n, Type.Str))
+		{
+			IR1.StrLit lit = (IR1.StrLit) n;
+			
+			// Add the string literal, but save it's offset.
+			int offset = stringLiterals.size();
+			stringLiterals.add(lit.s);
+			
+			X86.GLabel strLabel = new X86.GLabel("_S" + offset);
 		
-		// TODO need code
+			X86.emit2("leaq", new X86.AddrName(strLabel.s), temp);
+			
+			return temp;
+		}
 		
+		throw new GenException("gen_source(IR1.Src, X86.Reg): Unknown src type: " + n.getClass().getCanonicalName());
+	}
+	
+	static boolean isA(IR1.Src src, Type... types) throws GenException
+	{
+		Type actualType = getType(src);
+		
+		for (Type type : types)
+		{
+			if (actualType == type)
+			{
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	static enum Type {
+		Id, Temp, Int, Bool, Str
+	};
+	
+	static Type getType(IR1.Src src) throws GenException
+	{
+		if (src instanceof IR1.Id)
+		{
+			return Type.Id;
+		}
+		else if (src instanceof IR1.Temp)
+		{
+			return Type.Temp;
+		}
+		else if (src instanceof IR1.IntLit)
+		{
+			return Type.Int;
+		}
+		else if (src instanceof IR1.BoolLit)
+		{
+			return Type.Bool;
+		}
+		else if (src instanceof IR1.StrLit)
+		{
+			return Type.Str;
+		}
+		
+		throw new GenException("Unable to determine the type of: " + src.getClass().getCanonicalName());
 	}
 	
 	// Addr ---
