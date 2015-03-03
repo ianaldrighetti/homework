@@ -286,11 +286,11 @@ class CodeGen0 {
   //   rax to target reg
   //
   static void gen(IR1.Call n) throws Exception {
-    X86.Reg dest = regMap.get(n.dst);
-    if (dest == null)
+    //X86.Reg dest = regMap.get(n.dst);
+    //if (dest == null)
       return;
-    X86.Reg src = gen_source(n.src, dest);
-    X86.emitMov(X86.Size.Q, src, dest);
+    //X86.Reg src = gen_source(n.src, dest);
+    //X86.emitMov(X86.Size.Q, src, dest);
   }
 
   // Return ---  
@@ -332,7 +332,7 @@ class CodeGen0 {
   static X86.Reg gen_source(IR1.Src n, final X86.Reg temp) throws Exception {
 
     // ... need code ...
-
+return null;
 
   }
 
