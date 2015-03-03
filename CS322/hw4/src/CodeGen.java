@@ -12,6 +12,7 @@ import java.util.*;
 import com.sun.nio.sctp.PeerAddressChangeNotification.AddressChangeEvent;
 
 import ir1.*;
+import ir1.IR1.ROP;
 
 class CodeGen
 {
@@ -148,7 +149,10 @@ class CodeGen
 			frameSize += 8;
 		}
 		
-		X86.emit2(getX86Op(IR1.AOP.SUB), new X86.Imm(frameSize), X86.RSP);
+		if (frameSize > 0)
+		{
+			X86.emit2(getX86Op(IR1.AOP.SUB), new X86.Imm(frameSize), X86.RSP);
+		}
 		
 		for (IR1.Inst inst : n.code)
 		{
@@ -222,11 +226,15 @@ class CodeGen
 	//
 	static void gen(IR1.Binop n) throws Exception
 	{
-		System.out.println("#" + n);
+		X86.Reg rhs = null;
+		X86.Reg lhs = null;
 		
-		X86.Reg lhs = gen_source(n.src1, tempReg1);
-		X86.Reg rhs = gen_source(n.src2, tempReg2);
-		
+		if (!(n.op instanceof IR1.ROP))
+		{
+			rhs = gen_source(n.src2, tempReg1);
+			lhs = gen_source(n.src1, isA(n.op, IR1.AOP.DIV) ? X86.RAX : tempReg2);
+		}
+
 		if (isA(n.op, IR1.AOP.ADD, IR1.AOP.SUB, IR1.AOP.MUL, IR1.AOP.ADD, IR1.AOP.OR))
 		{
 			X86.Reg dest = regMap.get(n.dst);
@@ -239,10 +247,12 @@ class CodeGen
 				rhs = tempReg2;
 			}
 			
-			X86.emitMov(lhs.s, rhs, dest);
+			X86.emitMov(lhs.s, lhs, dest);
 			
 			String op = getX86Op(n.op);
 			X86.emit2(op, rhs, dest);
+			
+			return;
 		}
 		else if (isA(n.op, IR1.AOP.DIV))
 		{
@@ -253,14 +263,56 @@ class CodeGen
 				rhs = tempReg2;
 			}
 			
-			X86.emit("cqto");
-			X86.emit("idivq");
+			X86.emit0("cqto");
+			X86.emit1("idivq", rhs);
 			
 			X86.Reg dest = regMap.get(n.dst);
 			X86.emitMov(dest.s, X86.RAX, dest);
+			
+			return;
+		}
+		else if (isA(n.op, IR1.ROP.EQ, IR1.ROP.GE, IR1.ROP.GT, IR1.ROP.LE, IR1.ROP.LT, IR1.ROP.LT, IR1.ROP.NE))
+		{
+			X86.Reg dest = regMap.get(n.dst);
+			
+			rhs = gen_source(n.src1, tempReg1);
+			lhs = gen_source(n.src2, tempReg2);
+			
+			X86.emit2("cmpq", lhs, rhs);
+			X86.emit1("set" + getRelationalIndicator((IR1.ROP) n.op), X86.resize_reg(X86.Size.B, dest));
+			X86.emit2("movzbq", X86.resize_reg(X86.Size.B, dest), dest);
+			
+			return;
 		}
 		
-		throw new GenException("gen(IR1.Binop): Unhandled case of binary operator: " + n.op.getClass().getCanonicalName());
+		throw new GenException("gen(IR1.Binop): Unhandled case of binary operator: " + n.op.getClass().getCanonicalName() + " (" + n.op + ")");
+	}
+	
+	static String getRelationalIndicator(IR1.ROP op) throws GenException
+	{
+		switch (op)
+		{
+			case EQ:
+				return "e";
+				
+			case GE:
+				return "ge";
+				
+			case GT:
+				return "g";
+				
+			case LE:
+				return "le";
+				
+			case LT:
+				return "l";
+				
+			case NE:
+				return "ne";
+				
+			default:
+				throw new GenException("getRelationalIndicator(IR1.ROP): Unknown operator.");
+		}
 	}
 	
 	static String getX86Op(IR1.BOP op) throws Exception
@@ -306,7 +358,17 @@ class CodeGen
 	//
 	static void gen(IR1.Unop n) throws Exception
 	{
+		if (n.dst == null)
+		{
+			return;
+		}
 		
+		X86.Reg src = gen_source(n.src, tempReg1);
+		X86.Reg dest = regMap.get(n.dst);
+		
+		X86.emitMov(dest.s, src, dest);
+		
+		X86.emit1((n.op == IR1.UOP.NOT ? "not" : "UNKNOWN") + dest.s, dest);
 	}
 	
 	// Move ---
@@ -320,10 +382,16 @@ class CodeGen
 	static void gen(IR1.Move n) throws Exception
 	{
 		X86.Reg dest = regMap.get(n.dst) != null ? regMap.get(n.dst) : tempReg1;
-		X86.Reg from = gen_source(n.src, dest);
 		
+		X86.Reg src = gen_source(n.src, dest);
 		
-		//X86.emitMov(dest.s, from, dest);
+		// If source and destination are the same, no need to make a move.
+		if (src.equals(dest))
+		{
+			return;
+		}
+		
+		X86.emitMov(dest.s, src, dest);
 	}
 	
 	// Load ---
@@ -388,9 +456,11 @@ class CodeGen
 	//
 	static void gen(IR1.CJump n) throws Exception
 	{
+		X86.Reg lhs = gen_source(n.src1, tempReg1);
+		X86.Reg rhs = gen_source(n.src2, tempReg2);
 		
-		// TODO need code
-		
+		X86.emit2("cmpq", rhs, lhs);
+		X86.emit1("je", new X86.Label(fnName + "_" + n.lab.name));
 	}
 	
 	// Jump ---
@@ -473,7 +543,10 @@ class CodeGen
 	{
 		// TODO The rest.
 		
-		X86.emit2("addq", new X86.Imm(frameSize), X86.RSP);
+		if (frameSize > 0)
+		{
+			X86.emit2("addq", new X86.Imm(frameSize), X86.RSP);
+		}
 		
 		List<X86.Reg> regList = getCalleeSaveRegisters();
 		for (int index = regList.size() - 1; index >= 0; index--)
