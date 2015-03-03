@@ -427,6 +427,7 @@ class CodeGen
 	{
 		
 		// TODO need code
+		System.out.println("<--- TODO: Store");
 		
 	}
 	
@@ -474,6 +475,7 @@ class CodeGen
 	{
 		
 		// TODO need code
+		System.out.println("<--- TODO Jump");
 		
 	}
 	
