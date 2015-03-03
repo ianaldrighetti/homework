@@ -425,9 +425,13 @@ class CodeGen
 	//
 	static void gen(IR1.Store n) throws Exception
 	{
+		X86.Reg src = gen_source(n.src, tempReg1);
+		X86.Operand addr = gen_addr(n.addr, tempReg2);
+		
+		X86.emitMov(X86.Size.L, X86.resize_reg(X86.Size.L, src), addr);
 		
 		// TODO need code
-		System.out.println("<--- TODO: Store");
+		//System.out.println("<--- TODO: Store");
 		
 	}
 	

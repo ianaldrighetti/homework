@@ -6,41 +6,35 @@
 < 	addq %r11,%rax
 ---
 > 	addq %r10,%rax
-33a34,35
-> 	movq $1,%r10
-> 	movl %r10d,(%rax)
-40c42
+42c42
 < 	movq %rax,%r11
 ---
 > 	movq %rax,%r10
-42c44
+44c44
 < 	addq %r11,%rax
 ---
 > 	addq %r10,%rax
-43a46,47
-> 	movq $2,%r10
-> 	movl %r10d,(%rax)
-50c54
+54c54
 < 	movq %rax,%r11
 ---
 > 	movq %rax,%r10
-52c56
+56c56
 < 	addq %r11,%rax
 ---
 > 	addq %r10,%rax
-54c58
+58c58
 < 	movq (%rax),%rdi
 ---
 > 	movslq (%rax),%rdi
-63c67
+67c67
 < 	movq %rax,%r11
 ---
 > 	movq %rax,%r10
-65c69
+69c69
 < 	addq %r11,%rax
 ---
 > 	addq %r10,%rax
-67c71
+71c71
 < 	movq (%rax),%rdi
 ---
 > 	movslq (%rax),%rdi

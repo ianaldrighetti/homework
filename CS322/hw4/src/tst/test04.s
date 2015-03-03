@@ -31,6 +31,8 @@ _main:
 	movq %rbx,%rax
 	addq %r11,%rax
 			  #  [t3] = 1
+	movq $1,%r10
+	movl %r10d,(%rax)
 			  #  t4 = 1 * 4
 	movq $4,%r10
 	movq $1,%r11
@@ -41,6 +43,8 @@ _main:
 	movq %rbx,%rax
 	addq %r11,%rax
 			  #  [t5] = 2
+	movq $2,%r10
+	movl %r10d,(%rax)
 			  #  t6 = 0 * 4
 	movq $4,%r10
 	movq $0,%r11
