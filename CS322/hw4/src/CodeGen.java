@@ -572,6 +572,11 @@ class CodeGen
 	{
 		// TODO The rest.
 		
+		if (n.val != null)
+		{
+			X86.Reg reg = gen_source(n.val,  X86.RAX);
+		}
+		
 		if (frameSize > 0)
 		{
 			X86.emit2("addq", new X86.Imm(frameSize), X86.RSP);
