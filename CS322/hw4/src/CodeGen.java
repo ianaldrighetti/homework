@@ -163,6 +163,7 @@ class CodeGen
 			gen(inst);
 		}
 		
+		frameSize -= frameSize;
 	}
 	
 	// INSTRUCTIONS
@@ -580,7 +581,6 @@ class CodeGen
 		if (frameSize > 0)
 		{
 			X86.emit2("addq", new X86.Imm(frameSize), X86.RSP);
-			frameSize -= frameSize;
 		}
 		
 		List<X86.Reg> calleeSaveAllocated = new ArrayList<X86.Reg>();
