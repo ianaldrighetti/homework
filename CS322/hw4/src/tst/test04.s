@@ -55,7 +55,7 @@ _main:
 	movq %rbx,%rax
 	addq %r11,%rax
 			  #  t8 = [t7]
-	movq (%rax),%rdi
+	movslq (%rax),%rdi
 			  #  call _printInt(t8)
 	call _printInt
 			  #  t9 = 1 * 4
@@ -68,7 +68,7 @@ _main:
 	movq %rbx,%rax
 	addq %r11,%rax
 			  #  t11 = [t10]
-	movq (%rax),%rdi
+	movslq (%rax),%rdi
 			  #  call _printInt(t11)
 	call _printInt
 			  #  return 

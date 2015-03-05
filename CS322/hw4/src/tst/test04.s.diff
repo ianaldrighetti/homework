@@ -22,10 +22,6 @@
 < 	addq %r11,%rax
 ---
 > 	addq %r10,%rax
-58c58
-< 	movq (%rax),%rdi
----
-> 	movslq (%rax),%rdi
 67c67
 < 	movq %rax,%r11
 ---
@@ -34,7 +30,3 @@
 < 	addq %r11,%rax
 ---
 > 	addq %r10,%rax
-71c71
-< 	movq (%rax),%rdi
----
-> 	movslq (%rax),%rdi

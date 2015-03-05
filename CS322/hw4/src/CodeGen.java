@@ -502,8 +502,7 @@ class CodeGen
 	static void gen(IR1.Jump n) throws Exception
 	{
 		
-		// TODO need code
-		System.out.println("<--- TODO Jump");
+		X86.emit1("jmp", new X86.Label(fnName + "_" + n.lab.name));
 		
 	}
 	
