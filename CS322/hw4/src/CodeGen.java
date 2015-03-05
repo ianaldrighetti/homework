@@ -226,6 +226,12 @@ class CodeGen
 	//
 	static void gen(IR1.Binop n) throws Exception
 	{
+		// It's dead!
+		if (regMap.get(n.dst) == null)
+		{
+			return;
+		}
+		
 		X86.Reg rhs = null;
 		X86.Reg lhs = null;
 		
@@ -358,7 +364,7 @@ class CodeGen
 	//
 	static void gen(IR1.Unop n) throws Exception
 	{
-		if (n.dst == null)
+		if (regMap.get(n.dst) == null)
 		{
 			return;
 		}
@@ -381,6 +387,12 @@ class CodeGen
 	//
 	static void gen(IR1.Move n) throws Exception
 	{
+		// It's dead!
+		if (regMap.get(n.dst) == null)
+		{
+			return;
+		}
+		
 		X86.Reg dest = regMap.get(n.dst) != null ? regMap.get(n.dst) : tempReg1;
 		
 		X86.Reg src = gen_source(n.src, dest);
@@ -406,6 +418,12 @@ class CodeGen
 	//
 	static void gen(IR1.Load n) throws Exception
 	{
+		// It's dead!
+		if (regMap.get(n.dst) == null)
+		{
+			return;
+		}
+		
 		X86.Operand addr = gen_addr(n.addr, tempReg1);
 		X86.Reg dest = regMap.get(n.dst);
 		
