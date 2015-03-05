@@ -555,6 +555,8 @@ class CodeGen
 			return;
 		}
 		
+		X86.emitMov(dest.s, X86.RAX, dest);
+		
 		//X86.Reg src = gen_source(n.src, dest);
 		
 		//X86.emitMov(X86.Size.Q, src, dest);
@@ -576,6 +578,11 @@ class CodeGen
 		if (n.val != null)
 		{
 			X86.Reg reg = gen_source(n.val,  X86.RAX);
+			
+			if (!reg.equals(X86.RAX))
+			{
+				X86.emitMov(reg.s, reg, X86.RAX);
+			}
 		}
 		
 		if (frameSize > 0)
