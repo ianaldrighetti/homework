@@ -426,8 +426,10 @@ class CodeGen
 		
 		X86.Operand addr = gen_addr(n.addr, tempReg1);
 		X86.Reg dest = regMap.get(n.dst);
-		
-		X86.emitMov(dest.s, addr, dest);	
+
+		// TODO THis may not work...
+		X86.emit2("movslq", addr, dest);
+		//X86.emitMov(dest.s, addr, dest);	
 	}
 	
 	// Store ---
