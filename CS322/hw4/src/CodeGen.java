@@ -117,9 +117,15 @@ class CodeGen
 		
 		// call reg-alloc routine to assign registers to all Ids and Temps
 		regMap = RegAlloc.linearScan(n);
+		List<X86.Reg> calleeSaveAllocated = new ArrayList<X86.Reg>();
 		for (Map.Entry<IR1.Dest, X86.Reg> me : regMap.entrySet())
 		{
 			System.out.print("\t\t\t  # " + me.getKey() + "\t" + me.getValue() + "\n");
+			
+			if (Arrays.asList(X86.calleeSaveRegs).contains(me.getValue()))
+			{
+				calleeSaveAllocated.add(me.getValue());
+			}
 		}
 		
 		// TODO things
@@ -129,19 +135,17 @@ class CodeGen
 		
 		X86.emitGLabel(new X86.GLabel("_" + fnName));
 		
-		// Callee-save
-		//%rbx,%rbp,%r12,%r13,%r14,%r15
+		// Now we need to push all those that are callee save with pushq.
 		int calleeSaveSize = 0;
-		for (String local : n.locals)
+		for (X86.Reg reg : X86.calleeSaveRegs)
 		{
-			IR1.Dest p = new IR1.Id(local);
-			X86.Reg reg = regMap.get(p);
-
-			if (getCalleeSaveRegisters().contains(reg))
+			if (!calleeSaveAllocated.contains(reg))
 			{
-				X86.emit1("pushq", reg);
-				calleeSaveSize += 8;
+				continue;
 			}
+			
+			X86.emit1("pushq", reg);
+			calleeSaveSize += 8;
 		}
 		
 		if ((calleeSaveSize % 16) == 0)
@@ -374,7 +378,7 @@ class CodeGen
 		
 		X86.emitMov(dest.s, src, dest);
 		
-		X86.emit1((n.op == IR1.UOP.NOT ? "not" : "UNKNOWN") + dest.s, dest);
+		X86.emit1((n.op == IR1.UOP.NOT ? "not" : "neg") + dest.s, dest);
 	}
 	
 	// Move ---
@@ -572,17 +576,30 @@ class CodeGen
 		if (frameSize > 0)
 		{
 			X86.emit2("addq", new X86.Imm(frameSize), X86.RSP);
+			frameSize -= frameSize;
 		}
 		
-		List<X86.Reg> regList = getCalleeSaveRegisters();
-		for (int index = regList.size() - 1; index >= 0; index--)
+		List<X86.Reg> calleeSaveAllocated = new ArrayList<X86.Reg>();
+		for (Map.Entry<IR1.Dest, X86.Reg> me : regMap.entrySet())
 		{
-			X86.Reg reg = regList.get(index);
-			
-			if (regMap.containsValue(reg))
+			if (!Arrays.asList(X86.calleeSaveRegs).contains(me.getValue()))
 			{
-				X86.emit1("popq", reg);
+				continue;
 			}
+			
+			calleeSaveAllocated.add(me.getValue());
+		}
+		
+		for (int index = X86.calleeSaveRegs.length - 1; index >= 0; index--)
+		{
+			X86.Reg reg = X86.calleeSaveRegs[index];
+			
+			if (!calleeSaveAllocated.contains(reg))
+			{
+				continue;
+			}
+			
+			X86.emit1("popq", reg);
 		}
 		
 		X86.emit0("ret");
