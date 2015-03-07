@@ -158,6 +158,22 @@ class CodeGen
 			X86.emit2(getX86Op(IR1.AOP.SUB), new X86.Imm(frameSize), X86.RSP);
 		}
 		
+		// Now we need to move the parameters into here...
+		int index = 0;
+		for (String param : n.params)
+		{
+			if (index >= X86.argRegs.length)
+			{
+				throw new GenException("gen(IR1.Func): Too many arguments (>6).");
+			}
+			
+			IR1.Dest p = new IR1.Id(param);
+			X86.Reg destReg = regMap.get(p);
+			X86.Reg srcReg = X86.argRegs[index++];
+			
+			X86.emitMov(srcReg.s, srcReg, destReg);
+		}
+		
 		for (IR1.Inst inst : n.code)
 		{
 			gen(inst);
