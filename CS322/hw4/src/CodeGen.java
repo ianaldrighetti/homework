@@ -171,6 +171,11 @@ class CodeGen
 			X86.Reg destReg = regMap.get(p);
 			X86.Reg srcReg = X86.argRegs[index++];
 			
+			if (destReg == null)
+			{
+				continue;
+			}
+			
 			X86.emitMov(srcReg.s, srcReg, destReg);
 		}
 		
