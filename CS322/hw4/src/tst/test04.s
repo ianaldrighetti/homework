@@ -27,9 +27,9 @@ _main:
 	movq %r11,%rax
 	imulq %r10,%rax
 			  #  t3 = a + t2
-	movq %rax,%r11
+	movq %rax,%r10
 	movq %rbx,%rax
-	addq %r11,%rax
+	addq %r10,%rax
 			  #  [t3] = 1
 	movq $1,%r10
 	movl %r10d,(%rax)
@@ -39,9 +39,9 @@ _main:
 	movq %r11,%rax
 	imulq %r10,%rax
 			  #  t5 = a + t4
-	movq %rax,%r11
+	movq %rax,%r10
 	movq %rbx,%rax
-	addq %r11,%rax
+	addq %r10,%rax
 			  #  [t5] = 2
 	movq $2,%r10
 	movl %r10d,(%rax)
@@ -51,9 +51,9 @@ _main:
 	movq %r11,%rax
 	imulq %r10,%rax
 			  #  t7 = a + t6
-	movq %rax,%r11
+	movq %rax,%r10
 	movq %rbx,%rax
-	addq %r11,%rax
+	addq %r10,%rax
 			  #  t8 = [t7]
 	movslq (%rax),%rdi
 			  #  call _printInt(t8)
@@ -64,9 +64,9 @@ _main:
 	movq %r11,%rax
 	imulq %r10,%rax
 			  #  t10 = a + t9
-	movq %rax,%r11
+	movq %rax,%r10
 	movq %rbx,%rax
-	addq %r11,%rax
+	addq %r10,%rax
 			  #  t11 = [t10]
 	movslq (%rax),%rdi
 			  #  call _printInt(t11)

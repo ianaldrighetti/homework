@@ -263,8 +263,17 @@ class CodeGen
 		
 		if (!(n.op instanceof IR1.ROP))
 		{
-			rhs = gen_source(n.src2, tempReg1);
-			lhs = gen_source(n.src1, isA(n.op, IR1.AOP.DIV) ? X86.RAX : tempReg2);
+			X86.Reg rhsTempReg = tempReg1;
+			X86.Reg lhsTempReg = tempReg2;
+			
+			if (isAssignedAReg(n.src1) || isA(n.op, IR1.AOP.DIV))
+			{
+				//rhsTempReg = tempReg2;
+				//lhsTempReg = tempReg1;
+			}
+			
+			rhs = gen_source(n.src2, rhsTempReg);
+			lhs = gen_source(n.src1, isA(n.op, IR1.AOP.DIV) ? X86.RAX : lhsTempReg);
 		}
 
 		if (isA(n.op, IR1.AOP.ADD, IR1.AOP.SUB, IR1.AOP.MUL, IR1.AOP.ADD, IR1.AOP.OR))
@@ -274,9 +283,9 @@ class CodeGen
 			// If the rhs is within the destination, move it out.
 			if (rhs.equals(dest))
 			{
-				X86.emitMov(rhs.s, rhs, tempReg2);
+				X86.emitMov(rhs.s, rhs, tempReg1);
 				
-				rhs = tempReg2;
+				rhs = tempReg1;
 			}
 			
 			X86.emitMov(lhs.s, lhs, dest);
@@ -642,6 +651,11 @@ class CodeGen
 		X86.Reg[] calleeSave = { X86.RBX, X86.RBP, X86.R12, X86.R13, X86.R14, X86.R15 };
 
 		return Arrays.asList(calleeSave);
+	}
+	
+	static boolean isAssignedAReg(IR1.Src n) throws GenException
+	{
+		return isA(n, Type.Id, Type.Temp);
 	}
 	
 	// OPERANDS

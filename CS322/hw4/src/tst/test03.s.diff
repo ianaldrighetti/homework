@@ -1,8 +1,0 @@
-33c33
-< 	movq %rax,%r11
----
-> 	movq %rax,%r10
-35c35
-< 	subq %r11,%rax
----
-> 	subq %r10,%rax

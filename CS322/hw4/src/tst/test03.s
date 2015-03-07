@@ -30,9 +30,9 @@ _main:
 	cqto
 	idivq %r10
 			  #  t4 = t2 - t3
-	movq %rax,%r11
+	movq %rax,%r10
 	movq %rbx,%rax
-	subq %r11,%rax
+	subq %r10,%rax
 			  #  i = t4
 	movq %rax,%rdi
 			  #  t5 = true
